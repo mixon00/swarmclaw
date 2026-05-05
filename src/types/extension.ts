@@ -362,10 +362,10 @@ export interface ExtensionSetupCheckDeclaration {
 export interface ExtensionManagedResources {
   agents?: ExtensionManagedAgentDeclaration[]
   schedules?: ExtensionManagedScheduleDeclaration[]
-  /** Paperclip-compatible alias. SwarmClaw reconciles routines as managed schedules. */
+  /** Routine alias. SwarmClaw reconciles routines as managed schedules. */
   routines?: ExtensionManagedScheduleDeclaration[]
   localFolders?: ExtensionManagedLocalFolderDeclaration[]
-  /** Hermes-style gateway/platform declaration metadata for setup and diagnostics surfaces. */
+  /** Gateway/platform declaration metadata for setup and diagnostics surfaces. */
   gatewayPlatforms?: ExtensionGatewayPlatformDeclaration[]
   setupChecks?: ExtensionSetupCheckDeclaration[]
 }
@@ -420,7 +420,7 @@ export interface Extension {
   providers?: ExtensionProviderDefinition[]
   connectors?: ExtensionConnectorDefinition[]
   managedResources?: ExtensionManagedResources
-  /** Paperclip-compatible top-level aliases. Prefer managedResources for new SwarmClaw extensions. */
+  /** Top-level managed-resource aliases. Prefer managedResources for new SwarmClaw extensions. */
   agents?: ExtensionManagedAgentDeclaration[]
   schedules?: ExtensionManagedScheduleDeclaration[]
   routines?: ExtensionManagedScheduleDeclaration[]

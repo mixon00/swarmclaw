@@ -138,7 +138,7 @@ module.exports = {
     }
   ],
 
-  // --- Managed Resources (Paperclip-compatible) ---
+  // --- Managed Resources ---
   managedResources: {
     agents: [
       {
@@ -211,7 +211,7 @@ Key rules:
 - Dependency installs are run by the extension manager inside a per-extension workspace using the selected package manager with scripts disabled.
 - Extension settings are declared through ui.settingsFields and stored per extension ID
 - Managed resources let an extension declare provisionable agents, schedules/routines, trusted local folders, gateway platforms, and setup checks. Operators reconcile them through Extensions > Managed Resources or /api/extensions/managed-resources.
-- Paperclip-compatible top-level agents, routines, and localFolders are also accepted; SwarmClaw reconciles routines as schedules when they include schedule timing.
+- Top-level agents, routines, and localFolders are also accepted; SwarmClaw reconciles routines as schedules when they include schedule timing.
 - Keep extensions focused: one clear purpose per extension
 `
     }

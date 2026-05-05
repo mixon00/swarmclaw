@@ -315,6 +315,13 @@ async function runBrowserSmoke(baseUrl: string): Promise<void> {
     await waitForPageText(page, '/quality', {
       anyText: ['Quality', 'Operator Quality Center', 'Eval Lab', 'Approval Desk'],
     })
+    await waitForPageText(page, '/quality?tab=evals', {
+      anyText: ['Eval Lab'],
+    })
+    await page.waitForFunction(() => {
+      const text = document.body?.innerText || ''
+      return text.includes('Validation environment') && text.includes('Regression gate')
+    }, { timeout: PAGE_TIMEOUT_MS })
 
     const taskRes = await fetchWithTimeout(new URL('/api/tasks', baseUrl).toString(), {
       method: 'POST',

@@ -399,6 +399,16 @@ Operational docs: https://swarmclaw.ai/docs/observability
 
 ## Releases
 
+### v1.9.7 Highlights
+
+Bundled eval-gate release: approved baselines, regression checks, and Quality Center release gates for repeatable eval evidence.
+
+- **Eval regression baselines.** Operators can snapshot the latest scenario or suite score as an approved baseline with minimum score and regression allowance settings.
+- **Release gate API.** `/api/eval/gate` compares current eval evidence against thresholds and baselines, while `/api/eval/baselines` lists and updates approved baselines.
+- **CLI gate checks.** `swarmclaw eval gate`, `swarmclaw eval baselines`, and `swarmclaw eval baseline-set` expose the same release-gate workflow from automation.
+- **Quality Center gate panel.** Eval Lab now shows pass/warn/fail status, latest-run coverage, current score, baseline score, regression points, and actionable checks.
+- **Public-source hygiene.** Generic implementation comments now describe SwarmClaw behavior without naming internal comparison sources.
+
 ### v1.9.6 Highlights
 
 Bundled eval-environment release: validation preflights, deterministic eval workspaces, and clearer operator readiness before spending run budget.

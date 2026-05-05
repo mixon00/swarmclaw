@@ -232,9 +232,12 @@ const COMMAND_GROUPS = [
       cmd('suites', 'GET', '/eval/suites', 'List available eval suites (core, swe-bench-lite, gaia-l1, ...)'),
       cmd('status', 'GET', '/eval/run', 'Get eval run status'),
       cmd('environment', 'GET', '/eval/environments', 'Preview validation environment readiness for an eval'),
+      cmd('baselines', 'GET', '/eval/baselines', 'List eval regression baselines'),
+      cmd('gate', 'GET', '/eval/gate', 'Check the latest eval score against thresholds and baseline'),
       cmd('run', 'POST', '/eval/run', 'Run an eval scenario against an agent', { expectsJsonBody: true }),
       cmd('suite', 'POST', '/eval/suite', 'Run a full eval suite against an agent (pass { suite: "swe-bench-lite" } in body)', { expectsJsonBody: true }),
       cmd('environment-prepare', 'POST', '/eval/environments', 'Prepare validation environment readiness for an eval', { expectsJsonBody: true }),
+      cmd('baseline-set', 'POST', '/eval/baselines', 'Set an eval regression baseline from latest completed runs', { expectsJsonBody: true }),
     ],
   },
   {

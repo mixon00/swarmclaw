@@ -17,7 +17,7 @@ import {
 } from '@/lib/quality/quality-summary'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/stores/use-app-store'
-import type { EvalEnvironmentPlan, EvalRun, EvalSuiteResult } from '@/lib/server/eval/types'
+import type { EvalEnvironmentPlan, EvalGateResult, EvalRun, EvalSuiteResult } from '@/lib/server/eval/types'
 import type { Agent, ApprovalRequest, SessionRunRecord } from '@/types'
 
 type QualityTab = 'overview' | 'evals' | 'approvals' | 'runs'
@@ -117,6 +117,18 @@ function checkClass(level: 'info' | 'warn' | 'error'): string {
   return 'border-white/[0.06] bg-white/[0.025] text-text-3'
 }
 
+function gateStatusClass(status: EvalGateResult['status']): string {
+  if (status === 'pass') return 'border-emerald-500/25 bg-emerald-500/10 text-emerald-200'
+  if (status === 'warn') return 'border-amber-500/25 bg-amber-500/10 text-amber-200'
+  return 'border-rose-500/25 bg-rose-500/10 text-rose-200'
+}
+
+function gateCheckClass(status: EvalGateResult['status']): string {
+  if (status === 'fail') return 'border-rose-500/20 bg-rose-500/[0.05] text-rose-200'
+  if (status === 'warn') return 'border-amber-500/20 bg-amber-500/[0.05] text-amber-200'
+  return 'border-emerald-500/20 bg-emerald-500/[0.05] text-emerald-200'
+}
+
 function EvalEnvironmentPanel({ plan, loading, onRefresh }: {
   plan: EvalEnvironmentPlan | null
   loading: boolean
@@ -195,6 +207,115 @@ function EvalEnvironmentPanel({ plan, loading, onRefresh }: {
   )
 }
 
+function EvalGatePanel({
+  gate,
+  loading,
+  busy,
+  scope,
+  onScopeChange,
+  onRefresh,
+  onSetBaseline,
+}: {
+  gate: EvalGateResult | null
+  loading: boolean
+  busy: boolean
+  scope: 'scenario' | 'suite'
+  onScopeChange: (scope: 'scenario' | 'suite') => void
+  onRefresh: () => void
+  onSetBaseline: () => void
+}) {
+  return (
+    <div className="rounded-[12px] border border-white/[0.06] bg-white/[0.025] px-3 py-3">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-[13px] font-800 text-text">Regression gate</div>
+          <p className="mt-1 text-[11px] leading-relaxed text-text-3/65">
+            Compare latest eval evidence against thresholds and an approved baseline.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onRefresh}
+          disabled={loading}
+          className="shrink-0 rounded-[8px] border border-white/[0.08] px-2 py-1 text-[10px] font-800 text-text-2 transition-colors hover:bg-white/[0.06] disabled:opacity-40"
+        >
+          {loading ? 'Checking' : 'Refresh'}
+        </button>
+      </div>
+
+      <div className="mt-3 flex rounded-[10px] border border-white/[0.06] bg-white/[0.025] p-1">
+        {(['scenario', 'suite'] as const).map((item) => (
+          <button
+            key={item}
+            type="button"
+            onClick={() => onScopeChange(item)}
+            className={cn(
+              'flex-1 rounded-[8px] px-2 py-1.5 text-[10px] font-800 uppercase tracking-[0.08em] transition-colors',
+              scope === item ? 'bg-white/[0.1] text-text' : 'text-text-3 hover:bg-white/[0.05]',
+            )}
+          >
+            {item}
+          </button>
+        ))}
+      </div>
+
+      {!gate ? (
+        <div className="mt-3 text-[11px] text-text-3/60">{loading ? 'Checking gate...' : 'Run evals to build gate evidence.'}</div>
+      ) : (
+        <div className="mt-3 flex flex-col gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={cn('rounded-full border px-2 py-1 text-[10px] font-800 uppercase tracking-[0.08em]', gateStatusClass(gate.status))}>
+              {gate.status}
+            </span>
+            <span className="rounded-full bg-white/[0.05] px-2 py-1 text-[10px] font-700 text-text-3">
+              {gate.scope.label}
+            </span>
+            <span className="rounded-full bg-white/[0.05] px-2 py-1 text-[10px] font-700 text-text-3">
+              {gate.latestRuns.length}/{gate.scope.scenarioIds.length} latest runs
+            </span>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2">
+            <div className="rounded-[10px] border border-white/[0.06] bg-white/[0.02] px-2 py-2">
+              <div className="text-[9px] font-800 uppercase tracking-[0.08em] text-text-3/50">Current</div>
+              <div className="mt-1 text-[14px] font-800 text-text">{formatPercent(gate.currentPercent)}</div>
+            </div>
+            <div className="rounded-[10px] border border-white/[0.06] bg-white/[0.02] px-2 py-2">
+              <div className="text-[9px] font-800 uppercase tracking-[0.08em] text-text-3/50">Baseline</div>
+              <div className="mt-1 text-[14px] font-800 text-text">{gate.baseline ? `${gate.baseline.baselinePercent}%` : 'none'}</div>
+            </div>
+            <div className="rounded-[10px] border border-white/[0.06] bg-white/[0.02] px-2 py-2">
+              <div className="text-[9px] font-800 uppercase tracking-[0.08em] text-text-3/50">Regression</div>
+              <div className="mt-1 text-[14px] font-800 text-text">{gate.regressionPoints == null ? 'n/a' : `${gate.regressionPoints}pt`}</div>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            {gate.checks.slice(0, 4).map((check) => (
+              <div key={`${check.code}:${check.message}`} className={cn('rounded-[9px] border px-2.5 py-2 text-[11px] leading-relaxed', gateCheckClass(check.status))}>
+                <span className="font-800 uppercase tracking-[0.08em]">{check.status}</span>
+                <span className="ml-2">{check.message}</span>
+              </div>
+            ))}
+            {gate.checks.length > 4 && (
+              <div className="text-[10px] text-text-3/55">+{gate.checks.length - 4} more check{gate.checks.length - 4 === 1 ? '' : 's'}</div>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={onSetBaseline}
+            disabled={busy || gate.latestRuns.length === 0 || gate.checks.some((check) => check.code === 'missing_scope_runs')}
+            className="rounded-[9px] border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-[11px] font-800 text-text-2 transition-colors hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {busy ? 'Saving baseline' : gate.baseline ? 'Update baseline' : 'Set baseline'}
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function QualityWorkspace() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -219,6 +340,10 @@ export function QualityWorkspace() {
   const [evalBusy, setEvalBusy] = useState<string | null>(null)
   const [evalEnvironmentPlan, setEvalEnvironmentPlan] = useState<EvalEnvironmentPlan | null>(null)
   const [evalEnvironmentLoading, setEvalEnvironmentLoading] = useState(false)
+  const [evalGate, setEvalGate] = useState<EvalGateResult | null>(null)
+  const [evalGateScope, setEvalGateScope] = useState<'scenario' | 'suite'>('scenario')
+  const [evalGateLoading, setEvalGateLoading] = useState(false)
+  const [evalBaselineBusy, setEvalBaselineBusy] = useState(false)
   const [approvalBusy, setApprovalBusy] = useState<string | null>(null)
 
   useEffect(() => {
@@ -283,6 +408,30 @@ export function QualityWorkspace() {
     }
   }, [selectedAgentId, selectedScenarioId, selectedSuite])
 
+  const loadEvalGate = useCallback(async () => {
+    if (!selectedAgentId) {
+      setEvalGate(null)
+      return
+    }
+    if (evalGateScope === 'scenario' && !selectedScenarioId) {
+      setEvalGate(null)
+      return
+    }
+    const params = new URLSearchParams({ agentId: selectedAgentId })
+    if (evalGateScope === 'scenario') params.set('scenarioId', selectedScenarioId)
+    else params.set('suite', selectedSuite)
+    setEvalGateLoading(true)
+    try {
+      const gate = await api<EvalGateResult>('GET', `/eval/gate?${params.toString()}`)
+      setEvalGate(gate)
+    } catch (err) {
+      setEvalGate(null)
+      toast.error(err instanceof Error ? err.message : 'Unable to check eval gate')
+    } finally {
+      setEvalGateLoading(false)
+    }
+  }, [evalGateScope, selectedAgentId, selectedScenarioId, selectedSuite])
+
   useEffect(() => {
     void loadQualityData()
   }, [loadQualityData])
@@ -300,6 +449,10 @@ export function QualityWorkspace() {
   useEffect(() => {
     void loadEvalEnvironmentPlan()
   }, [loadEvalEnvironmentPlan])
+
+  useEffect(() => {
+    void loadEvalGate()
+  }, [loadEvalGate])
 
   useEffect(() => {
     if (!suites.some((suite) => suite.name === selectedSuite) && suites[0]) {
@@ -341,12 +494,13 @@ export function QualityWorkspace() {
       toast.success('Eval scenario completed')
       await loadQualityData({ silent: true })
       await loadEvalEnvironmentPlan()
+      await loadEvalGate()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Eval scenario failed')
     } finally {
       setEvalBusy(null)
     }
-  }, [evalEnvironmentPlan, loadEvalEnvironmentPlan, loadQualityData, selectedAgentId, selectedScenarioId])
+  }, [evalEnvironmentPlan, loadEvalEnvironmentPlan, loadEvalGate, loadQualityData, selectedAgentId, selectedScenarioId])
 
   const runSuite = useCallback(async (suiteName: string) => {
     if (!selectedAgentId) {
@@ -369,12 +523,37 @@ export function QualityWorkspace() {
       toast.success(`Suite completed at ${Math.round(result.percentage)}%`)
       await loadQualityData({ silent: true })
       await loadEvalEnvironmentPlan()
+      await loadEvalGate()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Eval suite failed')
     } finally {
       setEvalBusy(null)
     }
-  }, [evalEnvironmentPlan, loadEvalEnvironmentPlan, loadQualityData, selectedAgentId])
+  }, [evalEnvironmentPlan, loadEvalEnvironmentPlan, loadEvalGate, loadQualityData, selectedAgentId])
+
+  const setEvalBaseline = useCallback(async () => {
+    if (!selectedAgentId) {
+      toast.error('Choose an agent first')
+      return
+    }
+    if (evalGateScope === 'scenario' && !selectedScenarioId) {
+      toast.error('Choose a scenario first')
+      return
+    }
+    setEvalBaselineBusy(true)
+    try {
+      const body = evalGateScope === 'scenario'
+        ? { agentId: selectedAgentId, scenarioId: selectedScenarioId, minPercent: evalGate?.minPercent ?? 80, maxRegressionPoints: evalGate?.maxRegressionPoints ?? 5 }
+        : { agentId: selectedAgentId, suite: selectedSuite, minPercent: evalGate?.minPercent ?? 80, maxRegressionPoints: evalGate?.maxRegressionPoints ?? 5 }
+      const result = await api<{ gate: EvalGateResult }>('POST', '/eval/baselines', body)
+      setEvalGate(result.gate)
+      toast.success('Eval baseline saved')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Unable to save eval baseline')
+    } finally {
+      setEvalBaselineBusy(false)
+    }
+  }, [evalGate, evalGateScope, selectedAgentId, selectedScenarioId, selectedSuite])
 
   const actOnApproval = useCallback(async (approval: ApprovalRequest, approved: boolean) => {
     setApprovalBusy(approval.id)
@@ -599,6 +778,15 @@ export function QualityWorkspace() {
                     plan={evalEnvironmentPlan}
                     loading={evalEnvironmentLoading}
                     onRefresh={() => void loadEvalEnvironmentPlan({ refreshGateway: true })}
+                  />
+                  <EvalGatePanel
+                    gate={evalGate}
+                    loading={evalGateLoading}
+                    busy={evalBaselineBusy}
+                    scope={evalGateScope}
+                    onScopeChange={setEvalGateScope}
+                    onRefresh={() => void loadEvalGate()}
+                    onSetBaseline={() => void setEvalBaseline()}
                   />
                   <button
                     type="button"

@@ -105,3 +105,53 @@ export interface EvalSuiteResult {
   runs: EvalRun[]
   completedAt: number
 }
+
+export type EvalGateScopeType = 'scenario' | 'suite'
+
+export interface EvalGateScope {
+  type: EvalGateScopeType
+  id: string
+  label: string
+  scenarioIds: string[]
+}
+
+export interface EvalBaseline {
+  id: string
+  agentId: string
+  scope: EvalGateScope
+  baselineScore: number
+  baselineMaxScore: number
+  baselinePercent: number
+  minPercent: number
+  maxRegressionPoints: number
+  runIds: string[]
+  label?: string | null
+  notes?: string | null
+  createdAt: number
+  updatedAt: number
+}
+
+export type EvalGateStatus = 'pass' | 'warn' | 'fail'
+
+export interface EvalGateCheck {
+  code: string
+  status: EvalGateStatus
+  message: string
+  detail?: string
+}
+
+export interface EvalGateResult {
+  agentId: string
+  scope: EvalGateScope
+  status: EvalGateStatus
+  generatedAt: number
+  baseline: EvalBaseline | null
+  latestRuns: EvalRun[]
+  currentScore: number
+  currentMaxScore: number
+  currentPercent: number | null
+  regressionPoints: number | null
+  minPercent: number
+  maxRegressionPoints: number
+  checks: EvalGateCheck[]
+}

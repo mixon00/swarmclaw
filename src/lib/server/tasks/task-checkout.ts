@@ -6,7 +6,7 @@ import { loadTasks, saveTasks } from '@/lib/server/tasks/task-repository'
  * Atomically transition a task from queued → running with a checkout run ID.
  *
  * Uses a SQLite IMMEDIATE transaction to prevent two runners from starting the
- * same task concurrently (Paperclip-inspired atomic checkout pattern).
+ * same task concurrently.
  *
  * Returns the checked-out task on success, or null if the task was already
  * taken, missing, or no longer in queued status.
