@@ -271,7 +271,10 @@ export function ProviderSheet() {
   const modelList = models.split(',').map((m) => m.trim()).filter(Boolean)
   const showApiKey = isBuiltin ? editingBuiltin?.requiresApiKey || editingBuiltin?.optionalApiKey : requiresApiKey
   const canDiscoverModels = Boolean(isBuiltin && editingBuiltin?.supportsModelDiscovery)
-  const showTestButton = Boolean(isBuiltin && showApiKey && credentialId)
+  const showTestButton = Boolean(
+    isBuiltin
+    && (editingBuiltin?.requiresApiKey ? credentialId : (showApiKey || editingBuiltin?.requiresEndpoint || editingBuiltin?.optionalEndpoint)),
+  )
 
   const inputClass = "w-full px-4 py-3.5 rounded-[14px] border border-white/[0.08] bg-surface text-text text-[15px] outline-none transition-all duration-200 placeholder:text-text-3/50 focus-glow"
 

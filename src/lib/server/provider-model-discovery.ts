@@ -4,6 +4,7 @@ import { getProviderList } from '@/lib/providers'
 import { isOllamaCloudEndpoint, resolveStoredOllamaMode } from '@/lib/ollama-mode'
 import { OPENAI_COMPATIBLE_DEFAULTS } from '@/lib/server/provider-health'
 import { resolveCredentialSecret } from '@/lib/server/credentials/credential-service'
+import { normalizeLmStudioEndpoint, normalizeOpenAiCompatibleV1Endpoint } from '@/lib/providers/openai-compatible-endpoint'
 import type { ProviderInfo, ProviderModelDiscoveryResult } from '@/types'
 
 type DiscoveryStrategy = 'openai-compatible' | 'anthropic' | 'google' | 'ollama' | 'openclaw'
@@ -164,7 +165,11 @@ export function resolveDescriptor(input: DiscoverProviderModelsInput): Discovery
   }
 
   const openAiDefault = OPENAI_COMPATIBLE_DEFAULTS[providerId as keyof typeof OPENAI_COMPATIBLE_DEFAULTS]?.defaultEndpoint
-  const endpoint = normalizeEndpoint(input.endpoint, provider.defaultEndpoint || openAiDefault || '')
+  const endpoint = providerId === 'lmstudio'
+    ? normalizeLmStudioEndpoint(input.endpoint || provider.defaultEndpoint || openAiDefault || '')
+    : providerId === 'openai'
+      ? normalizeOpenAiCompatibleV1Endpoint(input.endpoint || provider.defaultEndpoint || openAiDefault || '', openAiDefault || 'https://api.openai.com/v1')
+      : normalizeEndpoint(input.endpoint, provider.defaultEndpoint || openAiDefault || '')
   return {
     providerId,
     providerName: provider.name,

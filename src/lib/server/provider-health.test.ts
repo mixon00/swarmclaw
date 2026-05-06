@@ -129,12 +129,13 @@ describe('provider-health', () => {
     assert.ok(defaults.xai)
     assert.ok(defaults.fireworks)
     assert.ok(defaults.hermes)
+    assert.ok(defaults.lmstudio)
 
     // Each entry has name and defaultEndpoint
     for (const [key, val] of Object.entries(defaults)) {
       assert.ok(typeof val.name === 'string' && val.name.length > 0)
       assert.ok(typeof val.defaultEndpoint === 'string' && val.defaultEndpoint.length > 0)
-      if (key === 'hermes') {
+      if (key === 'hermes' || key === 'lmstudio') {
         assert.ok(val.defaultEndpoint.startsWith('http://'))
       } else {
         assert.ok(val.defaultEndpoint.startsWith('https://'))

@@ -77,6 +77,34 @@ test('builtin provider override records do not surface as custom providers', () 
   assert.equal(output.openAiCount, 1)
 })
 
+test('LM Studio is available as a first-class local OpenAI-compatible provider', () => {
+  const output = runWithTempDataDir<{
+    providerName: string | null
+    defaultEndpoint: string | null
+    requiresApiKey: boolean | null
+    optionalApiKey: boolean | null
+    supportsModelDiscovery: boolean | null
+  }>(`
+    const providersModule = await import('@/lib/providers/index')
+    const providers = providersModule.default || providersModule
+    const provider = providers.getProviderList().find((entry) => entry.id === 'lmstudio')
+
+    console.log(JSON.stringify({
+      providerName: provider?.name ?? null,
+      defaultEndpoint: provider?.defaultEndpoint ?? null,
+      requiresApiKey: provider?.requiresApiKey ?? null,
+      optionalApiKey: provider?.optionalApiKey ?? null,
+      supportsModelDiscovery: provider?.supportsModelDiscovery ?? null,
+    }))
+  `)
+
+  assert.equal(output.providerName, 'LM Studio')
+  assert.equal(output.defaultEndpoint, 'http://127.0.0.1:1234/v1')
+  assert.equal(output.requiresApiKey, false)
+  assert.equal(output.optionalApiKey, true)
+  assert.equal(output.supportsModelDiscovery, true)
+})
+
 test('custom provider resolution includes defaultEndpoint and optionalApiKey', () => {
   const output = runWithTempDataDir<{
     defaultEndpoint: string | null

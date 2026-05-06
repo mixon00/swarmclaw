@@ -74,7 +74,15 @@ export function buildChatModel(opts: {
   const resolvedApiKey = apiKey ?? resolveApiKeyFromCredential(resolvedCredentialId)
   const providers = getProviderList()
   const providerInfo = providers.find((p) => p.id === provider)
-  const endpointRaw = apiEndpoint || providerInfo?.defaultEndpoint || null
+  const endpointRaw = provider === 'ollama'
+    ? apiEndpoint || providerInfo?.defaultEndpoint || null
+    : resolveProviderApiEndpoint({
+      provider,
+      model,
+      ollamaMode: ollamaMode ?? null,
+      credentialId: resolvedCredentialId,
+      apiEndpoint,
+    }) || providerInfo?.defaultEndpoint || null
   const endpoint = provider === 'openclaw'
     ? normalizeOpenClawEndpoint(endpointRaw)
     : endpointRaw

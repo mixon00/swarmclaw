@@ -1,5 +1,6 @@
 import { normalizeProviderEndpoint } from '@/lib/openclaw/openclaw-endpoint'
 import { getProvider } from '@/lib/providers'
+import { normalizeLmStudioEndpoint, normalizeOpenAiCompatibleV1Endpoint } from '@/lib/providers/openai-compatible-endpoint'
 import { loadCredential } from '@/lib/server/credentials/credential-repository'
 import { listCredentialIdsByProvider, resolveCredentialSecret } from '@/lib/server/credentials/credential-service'
 import { resolveOllamaRuntimeConfig } from '@/lib/server/ollama-runtime'
@@ -71,8 +72,17 @@ export function resolveProviderApiEndpoint(input: {
   const provider = clean(input.provider)
   if (!provider) return null
 
-  const explicitEndpoint = normalizeProviderEndpoint(provider, input.apiEndpoint ?? null)
-  if (explicitEndpoint) return explicitEndpoint
+  const pConfigs = loadProviderConfigs()
+  const pConfig = pConfigs[provider]
+  const providerInfo = getProvider(provider)
+  const honorsAgentEndpoint = Boolean(
+    pConfig?.type === 'custom'
+    || providerInfo?.requiresEndpoint
+    || providerInfo?.optionalEndpoint,
+  )
+
+  const explicitEndpoint = normalizeRuntimeEndpoint(provider, input.apiEndpoint ?? null)
+  if (explicitEndpoint && honorsAgentEndpoint) return explicitEndpoint
 
   if (provider === 'ollama') {
     const credentialId = resolveProviderCredentialId(input)
@@ -86,15 +96,24 @@ export function resolveProviderApiEndpoint(input: {
   }
 
   // Prefer provider config's custom baseUrl over the hardcoded defaultEndpoint
-  const pConfigs = loadProviderConfigs()
-  const pConfig = pConfigs[provider]
   if (pConfig?.baseUrl) {
-    const customNormalized = normalizeProviderEndpoint(provider, pConfig.baseUrl)
+    const customNormalized = normalizeRuntimeEndpoint(provider, pConfig.baseUrl)
     if (customNormalized) return customNormalized
     return pConfig.baseUrl.replace(/\/+$/, '')
   }
 
-  const providerInfo = getProvider(provider)
   if (!providerInfo?.defaultEndpoint) return null
-  return normalizeProviderEndpoint(provider, providerInfo.defaultEndpoint) || providerInfo.defaultEndpoint.replace(/\/+$/, '')
+  return normalizeRuntimeEndpoint(provider, providerInfo.defaultEndpoint) || providerInfo.defaultEndpoint.replace(/\/+$/, '')
+}
+
+function normalizeRuntimeEndpoint(provider: string, endpoint: string | null | undefined): string | null {
+  if (provider === 'lmstudio') {
+    const value = typeof endpoint === 'string' ? endpoint.trim() : ''
+    return value ? normalizeLmStudioEndpoint(value) : null
+  }
+  if (provider === 'openai') {
+    const value = typeof endpoint === 'string' ? endpoint.trim() : ''
+    return value ? normalizeOpenAiCompatibleV1Endpoint(value, 'https://api.openai.com/v1') : null
+  }
+  return normalizeProviderEndpoint(provider, endpoint)
 }

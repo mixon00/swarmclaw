@@ -263,6 +263,42 @@ test('buildChatModel uses a reasoning_content-preserving bridge for DeepSeek', (
   assert.equal(completionBridge.completions?.constructor?.name, 'DeepSeekReasoningChatOpenAICompletions')
 })
 
+test('buildChatModel ignores stale per-agent endpoints for fixed cloud providers', () => {
+  const llm = buildChatModel({
+    provider: 'deepseek',
+    model: 'deepseek-chat',
+    apiKey: 'deepseek-key',
+    apiEndpoint: 'http://127.0.0.1:1234/v1',
+  }) as ChatOpenAI
+
+  assert.equal(llm.model, 'deepseek-chat')
+  assert.equal(llm.clientConfig?.baseURL, 'https://api.deepseek.com/v1')
+})
+
+test('buildChatModel normalizes OpenAI-compatible OpenAI overrides to the v1 API', () => {
+  const llm = buildChatModel({
+    provider: 'openai',
+    model: 'google/gemma-4-e4b',
+    apiKey: 'local-key',
+    apiEndpoint: 'http://10.2.0.2:1234',
+  }) as ChatOpenAI
+
+  assert.equal(llm.model, 'google/gemma-4-e4b')
+  assert.equal(llm.clientConfig?.baseURL, 'http://10.2.0.2:1234/v1')
+})
+
+test('buildChatModel normalizes LM Studio base URLs to the OpenAI-compatible v1 API', () => {
+  const llm = buildChatModel({
+    provider: 'lmstudio',
+    model: 'google/gemma-4-e4b',
+    apiKey: 'lm-studio-key',
+    apiEndpoint: 'http://10.2.0.2:1234',
+  }) as ChatOpenAI
+
+  assert.equal(llm.model, 'google/gemma-4-e4b')
+  assert.equal(llm.clientConfig?.baseURL, 'http://10.2.0.2:1234/v1')
+})
+
 test('buildChatModel uses Ollama Cloud only when explicit cloud mode is selected', () => {
   saveCredentials({
     'cred-1': {

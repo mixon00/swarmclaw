@@ -14,6 +14,7 @@ import { streamOpenAiChat } from './openai'
 import { streamOllamaChat } from './ollama'
 import { streamAnthropicChat } from './anthropic'
 import { streamOpenClawChat } from './openclaw'
+import { normalizeLmStudioEndpoint, normalizeOpenAiCompatibleV1Endpoint } from './openai-compatible-endpoint'
 import { errorMessage, sleep, jitteredBackoff } from '@/lib/shared-utils'
 import { classifyProviderError } from './error-classification'
 import { log } from '@/lib/server/logger'
@@ -168,6 +169,24 @@ export const PROVIDERS: Record<string, BuiltinProviderConfig> = {
         const patchedSession = {
           ...opts.session,
           apiEndpoint: opts.session.apiEndpoint || 'http://127.0.0.1:8642/v1',
+        }
+        return streamOpenAiChat({ ...opts, session: patchedSession })
+      },
+    },
+  },
+  lmstudio: {
+    id: 'lmstudio',
+    name: 'LM Studio',
+    models: ['local-model', 'google/gemma-4-e4b'],
+    requiresApiKey: false,
+    optionalApiKey: true,
+    requiresEndpoint: true,
+    defaultEndpoint: 'http://127.0.0.1:1234/v1',
+    handler: {
+      streamChat: (opts) => {
+        const patchedSession = {
+          ...opts.session,
+          apiEndpoint: normalizeLmStudioEndpoint(opts.session.apiEndpoint),
         }
         return streamOpenAiChat({ ...opts, session: patchedSession })
       },
@@ -560,22 +579,29 @@ export function getProvider(id: string): BuiltinProviderConfig | null {
   if (builtin) {
     const pConfigs = loadProviderConfigs()
     const pConfig = pConfigs[id]
-    if (pConfig?.baseUrl && pConfig.baseUrl !== builtin.defaultEndpoint) {
-      const originalHandler = builtin.handler
-      return {
-        ...builtin,
-        handler: {
-          streamChat: (opts) => {
-            const patchedSession = {
-              ...opts.session,
-              apiEndpoint: opts.session.apiEndpoint || pConfig.baseUrl,
-            }
-            return originalHandler.streamChat({ ...opts, session: patchedSession })
-          },
+    const originalHandler = builtin.handler
+    return {
+      ...builtin,
+      handler: {
+        streamChat: (opts) => {
+          const configuredEndpoint = typeof pConfig?.baseUrl === 'string' && pConfig.baseUrl.trim()
+            ? normalizeProviderRuntimeEndpoint(id, pConfig.baseUrl)
+            : null
+          const sessionEndpoint = typeof opts.session.apiEndpoint === 'string' && opts.session.apiEndpoint.trim()
+            ? normalizeProviderRuntimeEndpoint(id, opts.session.apiEndpoint)
+            : null
+          const honorsAgentEndpoint = Boolean(builtin.requiresEndpoint || builtin.optionalEndpoint)
+          const apiEndpoint = honorsAgentEndpoint
+            ? sessionEndpoint || configuredEndpoint
+            : configuredEndpoint
+          const patchedSession = {
+            ...opts.session,
+            apiEndpoint: apiEndpoint || undefined,
+          }
+          return originalHandler.streamChat({ ...opts, session: patchedSession })
         },
-      }
+      },
     }
-    return builtin
   }
 
   // Check custom providers
@@ -617,6 +643,12 @@ export function getProvider(id: string): BuiltinProviderConfig | null {
   } catch { /* ignore */ }
 
   return null
+}
+
+function normalizeProviderRuntimeEndpoint(providerId: string, endpoint: string): string {
+  if (providerId === 'lmstudio') return normalizeLmStudioEndpoint(endpoint)
+  if (providerId === 'openai') return normalizeOpenAiCompatibleV1Endpoint(endpoint, 'https://api.openai.com/v1')
+  return endpoint.replace(/\/+$/, '')
 }
 
 /**

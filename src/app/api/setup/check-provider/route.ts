@@ -5,6 +5,7 @@ import { getDeviceId, wsConnect, rpcOnConnectedGateway } from '@/lib/providers/o
 import { isCliProviderId } from '@/lib/providers/cli-provider-metadata'
 import { checkCliProviderReady } from '@/lib/server/cli-provider-readiness'
 import { OPENAI_COMPATIBLE_DEFAULTS } from '@/lib/server/provider-health'
+import { normalizeLmStudioEndpoint, normalizeOpenAiCompatibleV1Endpoint } from '@/lib/providers/openai-compatible-endpoint'
 import { resolveOllamaRuntimeConfig } from '@/lib/server/ollama-runtime'
 import { normalizeOllamaSetupEndpoint, normalizeOpenClawUrl, parseErrorMessage } from './helpers'
 
@@ -70,6 +71,7 @@ async function checkOpenAiCompatible(
       DeepInfra: 'deepseek-ai/DeepSeek-R1-0528',
       OpenRouter: 'openai/gpt-4.1-mini',
       'Hermes Agent': 'hermes-agent',
+      'LM Studio': 'local-model',
     }
     testModel = fallbacks[providerName] || 'gpt-4o-mini'
   }
@@ -312,7 +314,13 @@ export async function POST(req: Request) {
       case 'openai': {
         if (!apiKey) return NextResponse.json({ ok: false, message: 'OpenAI API key is required.' })
         const info = OPENAI_COMPATIBLE_DEFAULTS.openai
-        const result = await checkOpenAiCompatible(info.name, apiKey, endpoint, info.defaultEndpoint, model)
+        const result = await checkOpenAiCompatible(
+          info.name,
+          apiKey,
+          normalizeOpenAiCompatibleV1Endpoint(endpoint || info.defaultEndpoint, info.defaultEndpoint),
+          info.defaultEndpoint,
+          model,
+        )
         return NextResponse.json(result)
       }
       case 'openrouter': {
@@ -343,6 +351,17 @@ export async function POST(req: Request) {
       case 'hermes': {
         const info = OPENAI_COMPATIBLE_DEFAULTS.hermes
         const result = await checkOpenAiCompatible(info.name, apiKey, endpoint, info.defaultEndpoint, model)
+        return NextResponse.json(result)
+      }
+      case 'lmstudio': {
+        const info = OPENAI_COMPATIBLE_DEFAULTS.lmstudio
+        const result = await checkOpenAiCompatible(
+          info.name,
+          apiKey,
+          normalizeLmStudioEndpoint(endpoint || info.defaultEndpoint),
+          info.defaultEndpoint,
+          model,
+        )
         return NextResponse.json(result)
       }
       case 'ollama': {

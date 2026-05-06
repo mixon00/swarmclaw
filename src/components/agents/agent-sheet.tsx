@@ -50,6 +50,7 @@ const AUTO_SYNC_MODEL_PROVIDER_IDS = new Set<ProviderType>([
   'nebius',
   'deepinfra',
   'hermes',
+  'lmstudio',
   'ollama',
 ])
 const CONNECTION_TEST_TIMEOUT_MS = 40_000
@@ -745,6 +746,23 @@ export function AgentSheet() {
     if (!model) setModel('default')
   }
 
+  const applyDirectProviderSelection = (nextProviderId: string) => {
+    const nextProvider = agentSelectableProviders.find((item) => item.id === nextProviderId)
+    const nextCredentials = resolveAgentSelectableProviderCredentials(nextProviderId, credentials, providerConfigs)
+    setProvider(nextProviderId)
+    setModel(nextProvider?.models[0] || '')
+    setCredentialId(nextCredentials[0]?.id || null)
+    setFallbackCredentialIds([])
+    setGatewayProfileId(null)
+    setApiEndpoint(nextProvider?.requiresEndpoint ? nextProvider.defaultEndpoint || null : null)
+    setTestStatus('idle')
+    setTestMessage('')
+    setTestErrorCode(null)
+    setAddingKey(false)
+    setNewKeyName('')
+    setNewKeyValue('')
+  }
+
   const updateRoutingTarget = (targetId: string, patch: Partial<AgentRoutingTarget>) => {
     setRoutingTargets((current) => current.map((target) => (
       target.id === targetId
@@ -778,7 +796,8 @@ export function AgentSheet() {
 
   const handleSave = async () => {
     // For any endpoint, just ensure bare host:port gets a protocol prepended
-    let normalizedEndpoint = apiEndpoint
+    const providerAllowsAgentEndpoint = Boolean(openclawEnabled || currentProvider?.requiresEndpoint || currentProvider?.optionalEndpoint)
+    let normalizedEndpoint = providerAllowsAgentEndpoint ? apiEndpoint : null
     if (normalizedEndpoint) {
       const url = normalizedEndpoint.trim().replace(/\/+$/, '')
       normalizedEndpoint = /^(https?|wss?):\/\//i.test(url) ? url : `http://${url}`
@@ -1543,13 +1562,7 @@ export function AgentSheet() {
             return (
               <button
                 key={p.id}
-                onClick={() => {
-                  setProvider(p.id)
-                  if (!nextCredentials.some((item) => item.id === credentialId)) {
-                    setCredentialId(nextCredentials[0]?.id || null)
-                  }
-                  setGatewayProfileId(null)
-                }}
+                onClick={() => applyDirectProviderSelection(p.id)}
                 className={`relative py-3.5 px-4 rounded-[14px] text-center cursor-pointer transition-all duration-200
                   active:scale-[0.97] text-[14px] font-600 border
                   ${provider === p.id
@@ -1731,13 +1744,16 @@ export function AgentSheet() {
 
       {(currentProvider?.requiresEndpoint || currentProvider?.optionalEndpoint) && (provider !== 'ollama' || ollamaMode === 'local') && (
         <div className="mb-8">
-          <SectionLabel>{provider === 'openclaw' ? 'OpenClaw Endpoint' : provider === 'hermes' ? 'Hermes API Endpoint' : 'Endpoint'}</SectionLabel>
+          <SectionLabel>{provider === 'openclaw' ? 'OpenClaw Endpoint' : provider === 'hermes' ? 'Hermes API Endpoint' : provider === 'lmstudio' ? 'LM Studio Endpoint' : 'Endpoint'}</SectionLabel>
           <input type="text" value={apiEndpoint || ''} onChange={(e) => setApiEndpoint(e.target.value || null)} placeholder={currentProvider.defaultEndpoint || 'http://localhost:11434'} className={`${inputClass} font-mono text-[14px]`} />
           {provider === 'openclaw' && (
             <p className="text-[13px] text-text-3/70 mt-2">The URL of your OpenClaw gateway</p>
           )}
           {provider === 'hermes' && (
             <p className="text-[13px] text-text-3/70 mt-2">Point this at the Hermes API server, usually <code className="text-text-2">http://127.0.0.1:8642/v1</code>.</p>
+          )}
+          {provider === 'lmstudio' && (
+            <p className="text-[13px] text-text-3/70 mt-2">Point this at the LM Studio local server. A bare host is normalized to <code className="text-text-2">/v1</code>.</p>
           )}
         </div>
       )}

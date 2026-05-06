@@ -86,7 +86,7 @@ export function useSaveBuiltinProviderMutation() {
       await api('PUT', `/providers/${id}/models`, { models })
       return api('PUT', `/providers/${id}`, {
         isEnabled,
-        ...(baseUrl ? { baseUrl } : {}),
+        ...(typeof baseUrl === 'string' ? { baseUrl } : {}),
       })
     },
     onSuccess: async () => {

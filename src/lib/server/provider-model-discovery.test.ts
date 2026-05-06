@@ -218,12 +218,33 @@ test('resolveDescriptor uses OpenRouter as an OpenAI-compatible provider', () =>
   assert.equal(descriptor?.optionalApiKey, false)
 })
 
+test('resolveDescriptor normalizes OpenAI-compatible OpenAI endpoints to /v1', () => {
+  const descriptor = resolveDescriptor({
+    providerId: 'openai',
+    endpoint: 'http://10.2.0.2:1234',
+  })
+  assert.equal(descriptor?.strategy, 'openai-compatible')
+  assert.equal(descriptor?.endpoint, 'http://10.2.0.2:1234/v1')
+  assert.equal(descriptor?.requiresApiKey, true)
+})
+
 test('resolveDescriptor uses Hermes as an OpenAI-compatible provider with optional auth', () => {
   const descriptor = resolveDescriptor({
     providerId: 'hermes',
   })
   assert.equal(descriptor?.strategy, 'openai-compatible')
   assert.equal(descriptor?.endpoint, 'http://127.0.0.1:8642/v1')
+  assert.equal(descriptor?.requiresApiKey, false)
+  assert.equal(descriptor?.optionalApiKey, true)
+})
+
+test('resolveDescriptor normalizes LM Studio discovery endpoints to /v1 with optional auth', () => {
+  const descriptor = resolveDescriptor({
+    providerId: 'lmstudio',
+    endpoint: 'http://10.2.0.2:1234',
+  })
+  assert.equal(descriptor?.strategy, 'openai-compatible')
+  assert.equal(descriptor?.endpoint, 'http://10.2.0.2:1234/v1')
   assert.equal(descriptor?.requiresApiKey, false)
   assert.equal(descriptor?.optionalApiKey, true)
 })

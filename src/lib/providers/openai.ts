@@ -7,6 +7,7 @@ import {
   createReasoningContentMetadata,
   shouldUseDeepSeekReasoningBridge,
 } from '@/lib/providers/deepseek-reasoning-chat-openai'
+import { normalizeLmStudioEndpoint, normalizeOpenAiCompatibleV1Endpoint } from '@/lib/providers/openai-compatible-endpoint'
 
 const TAG = 'provider-openai'
 
@@ -58,7 +59,11 @@ export function streamOpenAiChat({ session, message, imagePath, imageUrl, apiKey
         let fullResponse = ''
 
         // Support custom base URLs for custom providers
-        const baseUrl = session.apiEndpoint || PROVIDER_DEFAULTS.openai
+        const baseUrl = session.provider === 'lmstudio'
+          ? normalizeLmStudioEndpoint(session.apiEndpoint)
+          : session.provider === 'openai'
+            ? normalizeOpenAiCompatibleV1Endpoint(session.apiEndpoint, PROVIDER_DEFAULTS.openai)
+            : session.apiEndpoint || PROVIDER_DEFAULTS.openai
         const url = `${baseUrl.replace(/\/+$/, '')}/chat/completions`
 
         // OpenClaw endpoints behind Hostinger's proxy use express.json() middleware

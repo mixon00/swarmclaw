@@ -28,6 +28,7 @@ const SETUP_PROVIDERS_WITH_MODEL_DISCOVERY = new Set([
   'ollama',
   'openclaw',
   'hermes',
+  'lmstudio',
 ])
 
 /* ── Model combobox: search discovered models or type a custom one ── */

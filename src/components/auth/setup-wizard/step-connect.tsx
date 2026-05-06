@@ -335,6 +335,12 @@ export function StepConnect({
                 <p className="text-[12px] text-text-3">Use any reachable local or remote API-server endpoint exposed by Hermes.</p>
               </div>
             )}
+            {provider === 'lmstudio' && (
+              <div className="mt-2 space-y-0.5">
+                <p className="text-[12px] text-text-3">LM Studio&apos;s local server defaults to <code className="text-text-2">http://127.0.0.1:1234/v1</code>.</p>
+                <p className="text-[12px] text-text-3">If you paste a host without <code className="text-text-2">/v1</code>, SwarmClaw normalizes it before testing and chat.</p>
+              </div>
+            )}
           </div>
         )}
 

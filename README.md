@@ -182,7 +182,7 @@ Full hosted deployment guides live at https://swarmclaw.ai/docs/deployment
 
 ## Core Capabilities
 
-- **Providers**: 23 built-in — Claude Code CLI, Codex CLI, OpenCode CLI, Gemini CLI, Copilot CLI, Cursor Agent CLI, Qwen Code CLI, Goose, Anthropic, OpenAI, OpenRouter, Google Gemini, DeepSeek, Groq, Together, Mistral, xAI, Fireworks, Nebius, DeepInfra, Ollama, OpenClaw, and Hermes Agent, plus compatible custom endpoints.
+- **Providers**: 24+ built-in — Claude Code CLI, Codex CLI, OpenCode CLI, Gemini CLI, Copilot CLI, Cursor Agent CLI, Qwen Code CLI, Goose, Anthropic, OpenAI, OpenRouter, Google Gemini, DeepSeek, Groq, Together, Mistral, xAI, Fireworks, Nebius, DeepInfra, Ollama, LM Studio, OpenClaw, and Hermes Agent, plus compatible custom endpoints.
 - **OpenRouter**: <img src="public/provider-logos/openrouter.png" alt="OpenRouter logo" width="20" height="20" /> Use OpenRouter as a first-class built-in provider with its standard OpenAI-compatible endpoint and routed model IDs such as `openai/gpt-4.1-mini`.
 - **Hermes Agent**: <img src="public/provider-logos/hermes-agent.png" alt="Hermes Agent logo" width="20" height="20" /> Connect Hermes through its OpenAI-compatible API server, locally or through a reachable remote `/v1` endpoint.
 - **Delegation**: built-in delegation to Claude Code, Codex CLI, OpenCode CLI, Gemini CLI, Cursor Agent CLI, Qwen Code CLI, and native SwarmClaw subagents.
@@ -406,6 +406,15 @@ If you need a trace-specific endpoint, set `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` 
 Operational docs: https://swarmclaw.ai/docs/observability
 
 ## Releases
+
+### v1.9.20 Highlights
+
+Provider reliability release: local OpenAI-compatible runtimes now get safer endpoint handling, clearer setup, and first-class LM Studio support.
+
+- **LM Studio provider.** LM Studio is available in setup, provider settings, agent editing, model discovery, and connection checks with an optional API key.
+- **Endpoint normalization.** LM Studio and OpenAI-compatible OpenAI overrides normalize bare hosts like `http://127.0.0.1:1234` to `/v1` before calling models or chat completions.
+- **Provider switch isolation.** Switching an agent from a local endpoint back to a fixed cloud provider clears stale per-agent endpoints and fallback keys.
+- **Manual model flow.** Provider model saves now preserve explicit empty endpoint resets and optional-key providers can be tested without creating a credential.
 
 ### v1.9.19 Highlights
 
