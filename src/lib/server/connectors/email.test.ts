@@ -1,9 +1,15 @@
 import assert from 'node:assert/strict'
+import { EventEmitter } from 'node:events'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { describe, it } from 'node:test'
-import { buildAttachments } from './email'
+import {
+  attachImapErrorHandler,
+  buildAttachments,
+  buildEmailTlsOptions,
+  parseTlsRejectUnauthorized,
+} from './email'
 import { connectorSupportsBinaryMedia } from './response-media'
 
 describe('connectorSupportsBinaryMedia — email', () => {
@@ -61,5 +67,32 @@ describe('email buildAttachments', () => {
     } finally {
       fs.rmSync(dir, { recursive: true, force: true })
     }
+  })
+})
+
+describe('email TLS configuration', () => {
+  it('defaults to certificate verification', () => {
+    assert.equal(parseTlsRejectUnauthorized(undefined), true)
+    assert.equal(parseTlsRejectUnauthorized(''), true)
+    assert.deepEqual(buildEmailTlsOptions({ tlsRejectUnauthorized: true }), { rejectUnauthorized: true })
+  })
+
+  it('allows explicit self-signed certificate opt-out', () => {
+    assert.equal(parseTlsRejectUnauthorized(false), false)
+    assert.equal(parseTlsRejectUnauthorized('false'), false)
+    assert.equal(parseTlsRejectUnauthorized('0'), false)
+    assert.deepEqual(buildEmailTlsOptions({ tlsRejectUnauthorized: false }), { rejectUnauthorized: false })
+  })
+
+  it('handles IMAP socket errors without leaving the emitter unhandled', () => {
+    const imap = new EventEmitter()
+    let disconnected = false
+
+    attachImapErrorHandler(imap, () => {
+      disconnected = true
+    })
+
+    assert.doesNotThrow(() => imap.emit('error', new Error('DEPTH_ZERO_SELF_SIGNED_CERT')))
+    assert.equal(disconnected, true)
   })
 })

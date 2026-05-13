@@ -130,6 +130,46 @@ function rebuildStandaloneNativeModules(projectDir, standaloneDir, archName) {
   }
 }
 
+function traceAliasMatchesModule(aliasName, moduleName) {
+  return aliasName === moduleName || aliasName.startsWith(`${moduleName}-`)
+}
+
+function pathsResolveToSameFile(a, b) {
+  try {
+    return fs.realpathSync.native(a) === fs.realpathSync.native(b)
+  } catch {
+    return false
+  }
+}
+
+function syncStandaloneNativeModuleTraceAliases(standaloneDir, modules = STANDALONE_REBUILD_MODULES) {
+  const tracedNodeModulesDir = path.join(standaloneDir, '.next', 'node_modules')
+  if (!fs.existsSync(tracedNodeModulesDir)) return
+
+  const aliases = fs.readdirSync(tracedNodeModulesDir, { withFileTypes: true })
+  for (const moduleName of modules) {
+    const moduleNativeParts = nativeBinaryPartsForModule(moduleName)
+    if (moduleNativeParts.length === 0) continue
+
+    for (const alias of aliases) {
+      if (!traceAliasMatchesModule(alias.name, moduleName)) continue
+      const aliasDir = path.join(tracedNodeModulesDir, alias.name)
+
+      for (const nativeParts of moduleNativeParts) {
+        const nativeRelativeParts = nativeParts.slice(1)
+        const sourceNative = path.join(standaloneDir, 'node_modules', ...nativeParts)
+        const targetNative = path.join(aliasDir, ...nativeRelativeParts)
+        if (!fs.existsSync(sourceNative)) continue
+        if (pathsResolveToSameFile(sourceNative, targetNative)) continue
+
+        fs.mkdirSync(path.dirname(targetNative), { recursive: true })
+        fs.copyFileSync(sourceNative, targetNative)
+        fs.chmodSync(targetNative, fs.statSync(sourceNative).mode)
+      }
+    }
+  }
+}
+
 function validateStandaloneNativeModuleArch(standaloneDir, archName) {
   const expected = EXPECTED_MACHO_ARCH[archName]
   if (!expected) return
@@ -187,9 +227,11 @@ exports.default = async function afterPack(context) {
 
   console.log(`[after-pack] rebuilding required standalone native modules for arch=${archName}`)
   rebuildStandaloneNativeModules(projectDir, standaloneDir, archName)
+  syncStandaloneNativeModuleTraceAliases(standaloneDir)
   if (context.electronPlatformName === 'darwin') validateStandaloneNativeModuleArch(standaloneDir, archName)
 
   if (context.electronPlatformName === 'darwin') signMacApp(context)
 }
 
 exports.validateStandaloneNativeModuleArch = validateStandaloneNativeModuleArch
+exports.syncStandaloneNativeModuleTraceAliases = syncStandaloneNativeModuleTraceAliases

@@ -7,7 +7,7 @@ const fs = require('node:fs')
 const os = require('node:os')
 const path = require('node:path')
 const { spawnSync } = require('node:child_process')
-const { buildLegacyTsCliArgs } = require('../../bin/swarmclaw.js')
+const { buildLegacyTsCliArgs, resolveLegacyTsCliPath } = require('../../bin/swarmclaw.js')
 
 const CLI_BIN = path.join(__dirname, '..', '..', 'bin', 'swarmclaw.js')
 const PACKAGE_JSON = require('../../package.json')
@@ -207,4 +207,15 @@ test('legacy TS launcher falls back to tsx import when strip-types is unavailabl
   })
 
   assert.deepEqual(args, ['--no-warnings', '--import', 'tsx', cliPath, 'runs', 'list'])
+})
+
+test('legacy TS launcher uses tsx instead of strip-types inside node_modules', () => {
+  const cliPath = path.join(os.tmpdir(), 'node_modules', '@swarmclawai', 'swarmclaw', 'src', 'cli', 'index.ts')
+  const args = buildLegacyTsCliArgs(cliPath, ['agents', 'list'], {
+    supportsStripTypes: true,
+    hasTsxRuntime: true,
+  })
+
+  assert.deepEqual(args, ['--no-warnings', '--import', 'tsx', cliPath, 'agents', 'list'])
+  assert.equal(resolveLegacyTsCliPath(), path.join(APP_ROOT, 'src', 'cli', 'index.ts'))
 })

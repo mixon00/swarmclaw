@@ -58,3 +58,39 @@ test('provider models route updates custom provider configs without creating mod
     hasOverride: false,
   })
 })
+
+test('provider model overrides preserve built-in provider array rows', () => {
+  const output = runWithTempDataDir<{
+    overrides: Record<string, string[]>
+    providerModels: string[]
+    getPayload: { models: string[]; hasOverride: boolean }
+  }>(`
+    const storageMod = await import('./src/lib/server/storage')
+    const providerMod = await import('./src/lib/providers')
+    const routeMod = await import('./src/app/api/providers/[id]/models/route')
+    const storage = storageMod.default || storageMod
+    const providers = providerMod.default || providerMod
+    const route = routeMod.default || routeMod
+
+    storage.saveModelOverrides({ lmstudio: ['qwen3.5-27b'] })
+
+    const getResponse = await route.GET(
+      new Request('http://local/api/providers/lmstudio/models'),
+      { params: Promise.resolve({ id: 'lmstudio' }) },
+    )
+    const provider = providers.getProviderList().find((entry) => entry.id === 'lmstudio')
+
+    console.log(JSON.stringify({
+      overrides: storage.loadModelOverrides(),
+      providerModels: provider?.models || [],
+      getPayload: await getResponse.json(),
+    }))
+  `, { prefix: 'swarmclaw-provider-model-override-test-' })
+
+  assert.deepEqual(output.overrides, { lmstudio: ['qwen3.5-27b'] })
+  assert.deepEqual(output.providerModels, ['qwen3.5-27b'])
+  assert.deepEqual(output.getPayload, {
+    models: ['qwen3.5-27b'],
+    hasOverride: true,
+  })
+})

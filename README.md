@@ -151,14 +151,15 @@ clawhub install swarmclaw
 
 [Browse on ClawHub](https://clawhub.ai/skills/swarmclaw)
 
-## v1.9.27 Highlights
+## v1.9.28 Highlights
 
-Desktop compatibility and provider-save repair for Intel Mac users and OpenRouter setup.
+Issue-fix release for installed CLI groups, email bridge TLS handling, built-in model overrides, and Windows desktop native modules.
 
-- **Intel macOS native modules.** The desktop packaging hook now rebuilds Electron-loaded native modules with the target architecture and blocks a release if an x64 macOS bundle contains an arm64-only required addon.
-- **OpenRouter save repair.** Provider updates now tolerate UI metadata fields like `id`, `type`, `createdAt`, and `updatedAt` without persisting them, while still rejecting unrelated unknown fields.
-- **Downloads clarity.** The downloads page no longer guesses Apple Silicon when a browser hides the Mac architecture, so Intel users can choose the x64 DMG explicitly.
-- **Regression coverage.** Provider route and Electron after-pack tests cover the reported failure modes.
+- **Installed CLI groups.** Global npm installs route legacy API-backed group commands through the bundled TS runtime when installed under `node_modules`, avoiding Node 22.6+/25 type-stripping failures.
+- **Email bridge TLS resilience.** The email connector logs IMAP socket errors without crashing the daemon and supports `tlsRejectUnauthorized=false` for local self-signed IMAP/SMTP servers.
+- **Provider model override persistence.** Built-in provider live model saves now reload array-valued overrides instead of falling back to catalog defaults.
+- **Windows desktop native modules.** Desktop packaging syncs rebuilt Electron-native modules into traced `.next/node_modules` aliases so packaged Windows installs start against the correct ABI.
+- **Regression coverage.** CLI, email, provider route, and Electron after-pack tests cover the reported failure modes.
 
 ## Hosted Deploys
 
@@ -409,6 +410,16 @@ If you need a trace-specific endpoint, set `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` 
 Operational docs: https://swarmclaw.ai/docs/observability
 
 ## Releases
+
+### v1.9.28 Highlights
+
+Issue-fix release for installed CLI groups, email bridge TLS handling, built-in model overrides, and Windows desktop native modules.
+
+- **Installed CLI groups.** Global npm installs route legacy API-backed group commands through the bundled TS runtime when installed under `node_modules`, avoiding Node 22.6+/25 type-stripping failures.
+- **Email bridge TLS resilience.** The email connector logs IMAP socket errors without crashing the daemon and supports `tlsRejectUnauthorized=false` for local self-signed IMAP/SMTP servers.
+- **Provider model override persistence.** Built-in provider live model saves now reload array-valued overrides instead of falling back to catalog defaults.
+- **Windows desktop native modules.** Desktop packaging syncs rebuilt Electron-native modules into traced `.next/node_modules` aliases so packaged Windows installs start against the correct ABI.
+- **Regression coverage.** CLI, email, provider route, and Electron after-pack tests cover the reported failure modes.
 
 ### v1.9.27 Highlights
 

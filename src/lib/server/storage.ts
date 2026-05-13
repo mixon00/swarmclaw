@@ -187,6 +187,10 @@ const COLLECTIONS = [
 
 export type StorageCollection = (typeof COLLECTIONS)[number]
 
+const ARRAY_VALUE_COLLECTIONS = new Set<StorageCollection>([
+  'model_overrides',
+])
+
 for (const table of COLLECTIONS) {
   db.exec(`CREATE TABLE IF NOT EXISTS ${table} (id TEXT PRIMARY KEY, data TEXT NOT NULL)`)
 }
@@ -246,18 +250,20 @@ function getCollectionRawCache(table: string): LRUMap<string, string> {
 }
 
 function loadCollectionWithNormalizationState(table: string): {
-  result: Record<string, StoredObject>
+  result: Record<string, StoredObject | unknown[]>
   normalizedCount: number
 } {
   const endPerf = perf.start('storage', 'loadCollection', { table })
   const raw = getCollectionRawCache(table)
-  const result: Record<string, StoredObject> = {}
+  const result: Record<string, StoredObject | unknown[]> = {}
+  const allowsArrayValues = ARRAY_VALUE_COLLECTIONS.has(table as StorageCollection)
   let normalizedCount = 0
   for (const [id, data] of raw.entries()) {
     try {
       const { value: normalized, changed } = normalize(table, JSON.parse(data))
-      if (!normalized || typeof normalized !== 'object' || Array.isArray(normalized)) continue
-      result[id] = normalized as StoredObject
+      if (!normalized || typeof normalized !== 'object') continue
+      if (Array.isArray(normalized) && !allowsArrayValues) continue
+      result[id] = normalized as StoredObject | unknown[]
       if (changed) normalizedCount += 1
     } catch (err) {
       const fingerprint = `${table}:${id}`
@@ -277,8 +283,8 @@ function loadCollectionWithNormalizationState(table: string): {
 
 export function loadCollection(table: string): Record<string, StoredObject> {
   const { result, normalizedCount } = loadCollectionWithNormalizationState(table)
-  if (normalizedCount > 0) saveCollection(table, result)
-  return result
+  if (normalizedCount > 0) saveCollection(table, result as Record<string, unknown>)
+  return result as Record<string, StoredObject>
 }
 
 function saveCollection(table: string, data: Record<string, unknown>) {
@@ -1001,7 +1007,7 @@ export function patchAgent(
 const schedulesStore = createCollectionStore('schedules', { ttlMs: 10_000 })
 export function loadSchedules(): Record<string, Schedule> {
   const { result, normalizedCount } = loadCollectionWithNormalizationState('schedules')
-  if (normalizedCount > 0) saveCollection('schedules', result)
+  if (normalizedCount > 0) saveCollection('schedules', result as Record<string, unknown>)
   return result as unknown as Record<string, Schedule>
 }
 export const saveSchedules = schedulesStore.save

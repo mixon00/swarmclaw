@@ -55,9 +55,19 @@ function hasTsxRuntime() {
   }
 }
 
+function pathIsInsideNodeModules(filePath) {
+  return path.resolve(filePath).split(path.sep).includes('node_modules')
+}
+
 function buildLegacyTsCliArgs(cliPath, argv, options = {}) {
+  const ext = path.extname(cliPath).toLowerCase()
+  if (ext === '.js' || ext === '.cjs' || ext === '.mjs') {
+    return [cliPath, ...argv]
+  }
+
+  const insideNodeModules = options.insideNodeModules ?? pathIsInsideNodeModules(cliPath)
   const stripTypesSupported = options.supportsStripTypes ?? supportsStripTypes()
-  if (stripTypesSupported) {
+  if (stripTypesSupported && !insideNodeModules) {
     return ['--no-warnings', '--experimental-strip-types', cliPath, ...argv]
   }
 
@@ -67,6 +77,10 @@ function buildLegacyTsCliArgs(cliPath, argv, options = {}) {
   }
 
   return null
+}
+
+function resolveLegacyTsCliPath() {
+  return path.join(__dirname, '..', 'src', 'cli', 'index.ts')
 }
 
 function normalizeLegacyTsCliArgv(argv) {
@@ -98,7 +112,7 @@ function normalizeLegacyTsCliArgv(argv) {
 }
 
 function runLegacyTsCli(argv) {
-  const cliPath = path.join(__dirname, '..', 'src', 'cli', 'index.ts')
+  const cliPath = resolveLegacyTsCliPath()
   const args = buildLegacyTsCliArgs(cliPath, normalizeLegacyTsCliArgv(argv))
   const env = normalizeLegacyCliEnv(process.env)
   if (!args) {
@@ -358,6 +372,8 @@ module.exports = {
   buildLegacyTsCliArgs,
   hasTsxRuntime,
   normalizeLegacyTsCliArgv,
+  pathIsInsideNodeModules,
+  resolveLegacyTsCliPath,
   TS_CLI_ACTIONS,
   normalizeLegacyCliEnv,
   printPackageVersion,

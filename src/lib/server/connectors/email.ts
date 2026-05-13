@@ -21,12 +21,17 @@ interface EmailConfig {
   folder?: string
   pollIntervalSec?: number
   subjectPrefix?: string
+  tlsRejectUnauthorized: boolean
 }
 
 interface MailAttachment {
   path: string
   filename: string
   contentType?: string
+}
+
+interface ImapErrorEmitter {
+  on(event: 'error', listener: (err: unknown) => void): unknown
 }
 
 export function buildAttachments(options?: OutboundSendOptions): MailAttachment[] {
@@ -43,6 +48,28 @@ export function buildAttachments(options?: OutboundSendOptions): MailAttachment[
   }]
 }
 
+export function parseTlsRejectUnauthorized(value: unknown): boolean {
+  if (typeof value === 'boolean') return value
+  if (typeof value !== 'string') return true
+
+  const normalized = value.trim().toLowerCase()
+  if (!normalized) return true
+  if (['false', '0', 'no', 'off', 'disabled'].includes(normalized)) return false
+  if (['true', '1', 'yes', 'on', 'enabled'].includes(normalized)) return true
+  return true
+}
+
+export function buildEmailTlsOptions(config: Pick<EmailConfig, 'tlsRejectUnauthorized'>): { rejectUnauthorized: boolean } {
+  return { rejectUnauthorized: config.tlsRejectUnauthorized !== false }
+}
+
+export function attachImapErrorHandler(imap: ImapErrorEmitter, onDisconnected: () => void): void {
+  imap.on('error', (err: unknown) => {
+    onDisconnected()
+    log.error(TAG, `IMAP socket error: ${errorMessage(err)}`)
+  })
+}
+
 function getConfig(connector: Connector): EmailConfig {
   const c = connector.config as Record<string, unknown>
   return {
@@ -55,6 +82,7 @@ function getConfig(connector: Connector): EmailConfig {
     folder: String(c.folder ?? 'INBOX'),
     pollIntervalSec: Number(c.pollIntervalSec ?? 60),
     subjectPrefix: c.subjectPrefix ? String(c.subjectPrefix) : undefined,
+    tlsRejectUnauthorized: parseTlsRejectUnauthorized(c.tlsRejectUnauthorized),
   }
 }
 
@@ -68,17 +96,23 @@ const email: PlatformConnector = {
 
     const folder = config.folder || 'INBOX'
     const pollMs = (config.pollIntervalSec || 60) * 1000
+    const tls = buildEmailTlsOptions(config)
+    let connected = false
 
     // IMAP client for inbound
     const imap = new ImapFlow({
       host: config.imapHost,
       port: config.imapPort || 993,
       secure: (config.imapPort || 993) === 993,
+      tls,
       auth: {
         user: config.user,
         pass: config.password,
       },
       logger: false,
+    })
+    attachImapErrorHandler(imap, () => {
+      connected = false
     })
 
     // SMTP transport for outbound
@@ -86,6 +120,7 @@ const email: PlatformConnector = {
       host: config.smtpHost,
       port: config.smtpPort || 587,
       secure: (config.smtpPort || 587) === 465,
+      tls,
       auth: {
         user: config.user,
         pass: config.password,
@@ -94,7 +129,6 @@ const email: PlatformConnector = {
 
     // Track last seen UID to only process new messages
     let highwaterUid = 0
-    let connected = false
     let pollTimer: ReturnType<typeof setInterval> | null = null
 
     // Map to track original sender per channelId (email address) for replies

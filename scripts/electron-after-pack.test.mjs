@@ -23,6 +23,8 @@ describe('electron afterPack hook', () => {
     const sourcePkg = path.join(projectDir, 'node_modules', 'better-sqlite3')
     const standalonePkg = path.join(appOutDir, 'resources', '.next', 'standalone', 'node_modules', 'better-sqlite3')
     const standaloneNative = path.join(standalonePkg, 'build', 'Release', 'better_sqlite3.node')
+    const tracedAliasPkg = path.join(appOutDir, 'resources', '.next', 'standalone', '.next', 'node_modules', 'better-sqlite3-90e2652d1716b047')
+    const tracedAliasNative = path.join(tracedAliasPkg, 'build', 'Release', 'better_sqlite3.node')
 
     fs.mkdirSync(path.dirname(electronPkg), { recursive: true })
     fs.writeFileSync(electronPkg, JSON.stringify({ version: '33.4.11' }))
@@ -56,6 +58,8 @@ printf "mutated-root-%s" "$arch" > "$project_dir/node_modules/better-sqlite3/bui
     fs.mkdirSync(path.dirname(standaloneNative), { recursive: true })
     fs.writeFileSync(standaloneNative, 'host-node-build')
     fs.writeFileSync(path.join(path.dirname(standaloneNative), 'stale.node'), 'stale')
+    fs.mkdirSync(path.dirname(tracedAliasNative), { recursive: true })
+    fs.writeFileSync(tracedAliasNative, 'stale-traced-host-node-build')
 
     try {
       await afterPack({
@@ -69,6 +73,7 @@ printf "mutated-root-%s" "$arch" > "$project_dir/node_modules/better-sqlite3/bui
       })
 
       assert.equal(fs.readFileSync(standaloneNative, 'utf8'), 'electron-abi-build-x64 env:x64/x64')
+      assert.equal(fs.readFileSync(tracedAliasNative, 'utf8'), 'electron-abi-build-x64 env:x64/x64')
       assert.equal(
         fs.readFileSync(path.join(sourcePkg, 'build', 'Release', 'better_sqlite3.node'), 'utf8'),
         'host-arch',
