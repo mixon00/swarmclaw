@@ -92,7 +92,8 @@ import {
   resolveSenderPreferencePolicy,
 } from './contact-preferences'
 import { prepareConnectorVoiceNotePayload } from './voice-note'
-import { reconcileConnectorDeliveryText } from '@/lib/server/chat-execution/chat-execution-connector-delivery'
+import { sanitizeConnectorDeliveryText } from '@/lib/server/chat-execution/chat-execution-connector-delivery'
+import { stripAllInternalMetadata } from '@/lib/strip-internal-metadata'
 import { pruneIncompleteToolEvents, updateStreamedToolEvents } from '@/lib/server/chat-execution/chat-streaming-utils'
 import { guardUntrustedText, getUntrustedContentGuardMode } from '@/lib/server/untrusted-content'
 import {
@@ -432,7 +433,7 @@ export async function deliverQueuedConnectorRunResult(params: {
     session,
     toolEvents: params.result.toolEvents || [],
   })
-  fullText = reconcileConnectorDeliveryText(fullText, params.result.toolEvents || []).trim()
+  fullText = sanitizeConnectorDeliveryText(stripHiddenControlTokens(fullText), params.result.toolEvents || [])
 
   if (!fullText && !currentChannelDelivery) {
     await maybeSendStatusReaction(params.connector, params.msg, 'silent')
@@ -729,7 +730,7 @@ async function routeMessageToChatroom(connector: Connector, msg: InboundMessage)
         history,
       })
 
-      const responseText = stripHiddenControlTokens(result.finalResponse || result.fullText)
+      const responseText = stripAllInternalMetadata(stripHiddenControlTokens(result.finalResponse || result.fullText))
       if (responseText.trim() && !isNoMessage(responseText)) {
         // Persist agent response to chatroom
         const agentSource: MessageSource = {
@@ -1332,12 +1333,11 @@ If media sending fails, report the exact error and retry with a corrected path/t
   }
 
   const suppressHiddenResponse = shouldSuppressHiddenControlText(fullText)
-  fullText = stripHiddenControlTokens(fullText)
-  fullText = reconcileConnectorDeliveryText(fullText, settledConnectorToolEvents).trim()
+  fullText = sanitizeConnectorDeliveryText(stripHiddenControlTokens(fullText), settledConnectorToolEvents)
 
   // If the agent chose NO_MESSAGE, skip saving it to history — the user's message
   // is already recorded, and saving the sentinel would pollute the LLM's context
-  if (suppressHiddenResponse || isNoMessage(fullText)) {
+  if (suppressHiddenResponse || isNoMessage(fullText) || !fullText.trim()) {
     if (currentChannelDeliveryRef.current) {
       persistConnectorDeliveryMarker({
         session,

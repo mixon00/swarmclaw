@@ -761,6 +761,7 @@ const COMMAND_GROUPS = [
       cmd('handoffs', 'GET', '/tasks/handoffs', 'List task handoff readiness packets'),
       cmd('execution-policy', 'GET', '/tasks/:id/execution-policy', 'Get task execution policy state'),
       cmd('execution-policy-decision', 'POST', '/tasks/:id/execution-policy', 'Approve, request changes, or reset a task policy stage', { expectsJsonBody: true }),
+      cmd('retry', 'POST', '/tasks/:id/retry', 'Retry a failed task and requeue it'),
       cmd('create', 'POST', '/tasks', 'Create task', { expectsJsonBody: true }),
       cmd('bulk', 'POST', '/tasks/bulk', 'Bulk update tasks (status/agent/project)', { expectsJsonBody: true }),
       cmd('update', 'PUT', '/tasks/:id', 'Update task', { expectsJsonBody: true }),

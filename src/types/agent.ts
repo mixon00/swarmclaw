@@ -142,6 +142,7 @@ export interface Agent {
    */
   planningMode?: 'off' | 'strict' | null
   /** Controls whether file operations are confined to the workspace or allowed anywhere on the host. Default: 'workspace'. */
+  workspace?: string | null
   filesystemScope?: 'workspace' | 'machine' | null
   /** Per-agent filesystem restrictions. Globs matched against resolved paths. */
   fileAccessPolicy?: {

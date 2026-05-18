@@ -603,6 +603,9 @@ export function buildCrudTools(bctx: ToolBuildContext): StructuredToolInterface[
               const raw = buildCrudPayload(normalized, action, data)
               const defaults = RESOURCE_DEFAULTS[toolKey]
               const parsed = defaults ? defaults(raw) : raw
+              if (toolKey === 'manage_tasks' && !Object.prototype.hasOwnProperty.call(raw, 'status')) {
+                delete (parsed as Record<string, unknown>).status
+              }
               if (parsed && typeof parsed === 'object' && 'id' in parsed) {
                 delete (parsed as Record<string, unknown>).id
               }
@@ -696,6 +699,8 @@ export function buildCrudTools(bctx: ToolBuildContext): StructuredToolInterface[
                   now,
                   settings: loadSettings(),
                   fallbackAgentId: ctx?.agentId || null,
+                  creatorAgentId: ctx?.agentId || null,
+                  autoQueueDelegatedTasks: true,
                   defaultCwd: cwd,
                   deriveTitleFromDescription: true,
                   requireMeaningfulTitle: true,

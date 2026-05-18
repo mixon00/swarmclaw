@@ -154,6 +154,56 @@ describe('task-service assignment workflow transitions', () => {
     }
   })
 
+  it('auto-queues agent-created tasks delegated to a different agent', () => {
+    const prepared = prepareTaskCreation({
+      input: {
+        title: 'Build delegated client',
+        description: 'Hand this work to the builder.',
+        agentId: 'builder',
+      },
+      tasks: {},
+      now: 210,
+      creatorAgentId: 'coordinator',
+      autoQueueDelegatedTasks: true,
+    })
+
+    assert.equal(prepared.ok, true)
+    if (!prepared.ok) return
+    assert.equal(prepared.task.status, 'queued')
+    assert.equal(prepared.task.agentId, 'builder')
+  })
+
+  it('does not auto-queue self-assigned or explicitly backlogged tasks', () => {
+    const selfAssigned = prepareTaskCreation({
+      input: {
+        title: 'Self task',
+        description: '',
+        agentId: 'coordinator',
+      },
+      tasks: {},
+      now: 220,
+      creatorAgentId: 'coordinator',
+      autoQueueDelegatedTasks: true,
+    })
+    assert.equal(selfAssigned.ok, true)
+    if (selfAssigned.ok) assert.equal(selfAssigned.task.status, 'backlog')
+
+    const explicitBacklog = prepareTaskCreation({
+      input: {
+        title: 'Explicit backlog',
+        description: '',
+        agentId: 'builder',
+        status: 'backlog',
+      },
+      tasks: {},
+      now: 230,
+      creatorAgentId: 'coordinator',
+      autoQueueDelegatedTasks: true,
+    })
+    assert.equal(explicitBacklog.ok, true)
+    if (explicitBacklog.ok) assert.equal(explicitBacklog.task.status, 'backlog')
+  })
+
   it('leaves already-started workflow states alone', () => {
     const next = resolveAssignmentWorkflowStateTransition({
       previousAgentId: '',

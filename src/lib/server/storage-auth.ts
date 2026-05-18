@@ -19,23 +19,44 @@ const GENERATED_ENV_PATH = path.join(DATA_DIR, '.env.generated')
 const CREDENTIAL_SECRET_FILE = path.join(DATA_DIR, 'credential-secret')
 
 // --- .env loading ---
-function loadEnvFile(filePath: string): void {
-  if (!fs.existsSync(filePath)) return
+type LoadedEnvFile = Record<string, string>
+
+function loadEnvFile(filePath: string): LoadedEnvFile {
+  const loaded: LoadedEnvFile = {}
+  if (!fs.existsSync(filePath)) return loaded
   fs.readFileSync(filePath, 'utf8').split(/\r?\n/).forEach(line => {
     const [k, ...v] = line.split('=')
-    if (k && v.length) process.env[k.trim()] = v.join('=').trim()
+    if (k && v.length) loaded[k.trim()] = v.join('=').trim()
   })
+  return loaded
 }
 
-function loadEnv() {
-  // Load fallback first so that .env.local values take precedence.
-  // .env.generated is auto-created in Docker where .env.local isn't writable.
-  loadEnvFile(GENERATED_ENV_PATH)
-  loadEnvFile(path.join(process.cwd(), '.env.local'))
+function applyLoadedEnv(loaded: LoadedEnvFile, externalKeys: Set<string>, options?: { overwriteLoaded?: boolean }) {
+  for (const [key, value] of Object.entries(loaded)) {
+    if (externalKeys.has(key)) continue
+    if (options?.overwriteLoaded || process.env[key] === undefined || process.env[key] === '') {
+      process.env[key] = value
+    }
+  }
 }
-if (!IS_BUILD_BOOTSTRAP) {
-  loadEnv()
+
+function loadEnv(): { generated: LoadedEnvFile; local: LoadedEnvFile } {
+  const externalKeys = new Set(
+    Object.entries(process.env)
+      .filter(([, value]) => typeof value === 'string' && value.length > 0)
+      .map(([key]) => key),
+  )
+  const generated = loadEnvFile(GENERATED_ENV_PATH)
+  const local = loadEnvFile(path.join(process.cwd(), '.env.local'))
+
+  applyLoadedEnv(generated, externalKeys)
+  applyLoadedEnv(local, externalKeys, { overwriteLoaded: true })
+  return { generated, local }
 }
+const externalCredentialSecret = process.env.CREDENTIAL_SECRET?.trim() || ''
+const loadedEnv: { generated: LoadedEnvFile; local: LoadedEnvFile } = !IS_BUILD_BOOTSTRAP
+  ? loadEnv()
+  : { generated: {}, local: {} }
 
 /** Append a key=value to a file only if the key doesn't already exist in it. */
 function appendEnvKeyIfMissing(envPath: string, key: string, value: string): void {
@@ -104,25 +125,28 @@ function writeCredentialSecretFile(secret: string): boolean {
 // .env.local (cwd changes on npm-global upgrade), so each upgrade
 // silently regenerated it and orphaned every encrypted credential.
 if (!IS_BUILD_BOOTSTRAP) {
-  // If a previous version wrote the secret to .env.local / .env.generated,
-  // loadEnv() above already placed it on process.env. Treat that as the
-  // authoritative value AND migrate it into the dedicated file so future
-  // upgrades read from there.
-  const envSecret = process.env.CREDENTIAL_SECRET?.trim() || ''
+  const legacyEnvSecret = loadedEnv.local.CREDENTIAL_SECRET?.trim()
+    || loadedEnv.generated.CREDENTIAL_SECRET?.trim()
+    || ''
   const fileSecret = readCredentialSecretFile()
-  if (envSecret && !fileSecret) {
-    if (writeCredentialSecretFile(envSecret)) {
+  if (externalCredentialSecret) {
+    process.env.CREDENTIAL_SECRET = externalCredentialSecret
+    if (fileSecret && fileSecret !== externalCredentialSecret) {
+      log.warn(TAG, `CREDENTIAL_SECRET is set by the environment and differs from ${CREDENTIAL_SECRET_FILE}; using the environment value.`)
+    }
+  } else if (fileSecret) {
+    process.env.CREDENTIAL_SECRET = fileSecret
+    if (legacyEnvSecret && legacyEnvSecret !== fileSecret) {
+      // Both persisted locations exist and disagree. Trust DATA_DIR because it
+      // survives npm-global upgrades and Docker restarts.
+      log.warn(TAG, `CREDENTIAL_SECRET mismatch between legacy env files and ${CREDENTIAL_SECRET_FILE}; using the file value.`)
+    }
+  } else if (legacyEnvSecret) {
+    process.env.CREDENTIAL_SECRET = legacyEnvSecret
+    if (writeCredentialSecretFile(legacyEnvSecret)) {
       log.info(TAG, `Migrated CREDENTIAL_SECRET from .env to ${CREDENTIAL_SECRET_FILE}`)
     }
-  } else if (fileSecret && !envSecret) {
-    process.env.CREDENTIAL_SECRET = fileSecret
-  } else if (fileSecret && envSecret && fileSecret !== envSecret) {
-    // Both are set and disagree — trust the dedicated file (the stable home)
-    // and warn loudly. This usually means a fresh .env.local got generated
-    // during install and contains a stale value; the file is authoritative.
-    log.warn(TAG, `CREDENTIAL_SECRET mismatch between env and ${CREDENTIAL_SECRET_FILE}; using the file value (older credentials encrypted under that secret are recoverable, the env value would orphan them).`)
-    process.env.CREDENTIAL_SECRET = fileSecret
-  } else if (!envSecret && !fileSecret) {
+  } else {
     // First-ever launch on this DATA_DIR. Generate.
     const secret = crypto.randomBytes(32).toString('hex')
     process.env.CREDENTIAL_SECRET = secret

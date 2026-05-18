@@ -87,6 +87,35 @@ describe('credential-env', () => {
       const result = buildCredentialEnv(['nonexistent-id'])
       assert.deepEqual(result, { env: {}, secrets: [] })
     })
+
+    it('injects credentials stored under encryptedKey', () => {
+      const output = runWithTempDataDir<{
+        env: Record<string, string>
+        secrets: string[]
+      }>(`
+        process.env.CREDENTIAL_SECRET = 'a'.repeat(64)
+        const storageMod = await import('@/lib/server/storage')
+        const credentialEnvMod = await import('@/lib/server/session-tools/credential-env')
+        const storage = storageMod.default || storageMod
+        const credentialEnv = credentialEnvMod.default || credentialEnvMod
+        const encryptedKey = storage.encryptKey('github_pat_execute_tool')
+        storage.saveCredentials({
+          'cred-github': {
+            id: 'cred-github',
+            provider: 'github',
+            name: 'token',
+            encryptedKey,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          },
+        })
+        const result = credentialEnv.buildCredentialEnv(['cred-github'])
+        console.log(JSON.stringify(result))
+      `)
+
+      assert.equal(output.env.GITHUB_TOKEN, 'github_pat_execute_tool')
+      assert.deepEqual(output.secrets, ['github_pat_execute_tool'])
+    })
   })
 })
 

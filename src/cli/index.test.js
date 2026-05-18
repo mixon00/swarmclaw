@@ -225,6 +225,36 @@ test('tasks execution-policy-decision posts policy decisions', async () => {
   assert.equal(stderr.toString(), '')
 })
 
+test('tasks retry posts to the failed-task retry endpoint', async () => {
+  const stdout = makeWritable()
+  const stderr = makeWritable()
+  const calls = []
+
+  const fetchImpl = async (url, init) => {
+    calls.push({ url: String(url), init })
+    return jsonResponse({ id: 'task-1', status: 'queued' })
+  }
+
+  const exitCode = await runCli(
+    ['tasks', 'retry', 'task-1', '--json'],
+    {
+      fetchImpl,
+      stdout,
+      stderr,
+      env: {},
+      cwd: process.cwd(),
+    }
+  )
+
+  assert.equal(exitCode, 0)
+  assert.equal(calls.length, 1)
+  assert.match(calls[0].url, /\/api\/tasks\/task-1\/retry$/)
+  assert.equal(calls[0].init.method, 'POST')
+  assert.equal(calls[0].init.body, undefined)
+  assert.match(stdout.toString(), /"queued"/)
+  assert.equal(stderr.toString(), '')
+})
+
 test('gateways drain command posts a lifecycle control action', async () => {
   const stdout = makeWritable()
   const stderr = makeWritable()

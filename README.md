@@ -151,6 +151,16 @@ openclaw skills install swarmclaw
 
 [Browse on ClawHub](https://clawhub.ai/waydelyle/swarmclaw)
 
+## v1.9.33 Highlights
+
+Issue and PR validation release for credential durability, delegated task dispatch, connector output hygiene, and OpenClaw gateway protocol compatibility.
+
+- **Credential durability.** Execute-tool credential injection now reads the persisted `encryptedKey` field, and `CREDENTIAL_SECRET` now resolves in a stable order: explicit environment value, `DATA_DIR/credential-secret`, legacy env files, then generated fallback.
+- **Delegated task dispatch.** Agent-created tasks delegated to another agent auto-queue when no explicit status is supplied, and failed dead-lettered tasks can be requeued through `POST /api/tasks/:id/retry`.
+- **Connector output hygiene.** Connector replies now reuse the internal metadata scrubber before delivery and persistence, while successful non-connector delivery tool output is no longer overwritten as an unconfirmed send.
+- **Agent and gateway compatibility.** Agent updates preserve workspace filesystem settings, and OpenClaw gateway routes now use protocol version 4.
+- **Regression coverage.** Added tests for credential env injection, secret precedence, delegated queueing, failed-task retry, connector sanitization, agent workspace settings, and OpenClaw gateway protocol exports.
+
 ## v1.9.32 Highlights
 
 PR integration release for background model routing, reflection memory controls, and current ClawHub install guidance.
@@ -434,6 +444,16 @@ If you need a trace-specific endpoint, set `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` 
 Operational docs: https://swarmclaw.ai/docs/observability
 
 ## Releases
+
+### v1.9.33 Highlights
+
+Issue and PR validation release for credential durability, delegated task dispatch, connector output hygiene, and OpenClaw gateway protocol compatibility.
+
+- **Credential durability.** Execute-tool credential injection now reads the persisted `encryptedKey` field, and `CREDENTIAL_SECRET` now resolves in a stable order: explicit environment value, `DATA_DIR/credential-secret`, legacy env files, then generated fallback.
+- **Delegated task dispatch.** Agent-created tasks delegated to another agent auto-queue when no explicit status is supplied, and failed dead-lettered tasks can be requeued through `POST /api/tasks/:id/retry`.
+- **Connector output hygiene.** Connector replies now reuse the internal metadata scrubber before delivery and persistence, while successful non-connector delivery tool output is no longer overwritten as an unconfirmed send.
+- **Agent and gateway compatibility.** Agent updates preserve workspace filesystem settings, and OpenClaw gateway routes now use protocol version 4.
+- **Regression coverage.** Added tests for credential env injection, secret precedence, delegated queueing, failed-task retry, connector sanitization, agent workspace settings, and OpenClaw gateway protocol exports.
 
 ### v1.9.32 Highlights
 

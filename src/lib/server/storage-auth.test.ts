@@ -3,6 +3,71 @@ import { describe, it, beforeEach, afterEach } from 'node:test'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
+import { spawnSync } from 'node:child_process'
+
+const repoRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../../..')
+
+function runStorageAuthImport(options: {
+  envLocal?: string
+  generatedEnv?: string
+  credentialSecretFile?: string
+  externalCredentialSecret?: string
+}) {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'storage-auth-import-'))
+  const dataDir = path.join(tmpDir, 'data')
+  const cwd = path.join(tmpDir, 'cwd')
+  fs.mkdirSync(dataDir, { recursive: true })
+  fs.mkdirSync(cwd, { recursive: true })
+  try {
+    if (options.envLocal !== undefined) {
+      fs.writeFileSync(path.join(cwd, '.env.local'), options.envLocal, 'utf8')
+    }
+    if (options.generatedEnv !== undefined) {
+      fs.writeFileSync(path.join(dataDir, '.env.generated'), options.generatedEnv, 'utf8')
+    }
+    if (options.credentialSecretFile !== undefined) {
+      fs.writeFileSync(path.join(dataDir, 'credential-secret'), options.credentialSecretFile, { encoding: 'utf8', mode: 0o600 })
+    }
+    const env: NodeJS.ProcessEnv = {
+      ...process.env,
+      DATA_DIR: dataDir,
+      WORKSPACE_DIR: path.join(tmpDir, 'workspace'),
+      SWARMCLAW_DAEMON_AUTOSTART: '0',
+    }
+    delete env.ACCESS_KEY
+    delete env.CREDENTIAL_SECRET
+    delete env.SWARMCLAW_BUILD_MODE
+    if (options.externalCredentialSecret !== undefined) {
+      env.CREDENTIAL_SECRET = options.externalCredentialSecret
+    }
+    const script = `
+      import fs from 'node:fs'
+      import path from 'node:path'
+      import { pathToFileURL } from 'node:url'
+      process.chdir(${JSON.stringify(cwd)})
+      await import(pathToFileURL(${JSON.stringify(path.join(repoRoot, 'src/lib/server/storage-auth.ts'))}).href)
+      const secretPath = path.join(process.env.DATA_DIR, 'credential-secret')
+      const fileSecret = fs.existsSync(secretPath) ? fs.readFileSync(secretPath, 'utf8').trim() : ''
+      const mode = fs.existsSync(secretPath) ? (fs.statSync(secretPath).mode & 0o777).toString(8) : ''
+      console.log(JSON.stringify({
+        credentialSecret: process.env.CREDENTIAL_SECRET || '',
+        fileSecret,
+        mode,
+      }))
+    `
+    const result = spawnSync(process.execPath, ['--import', 'tsx', '--input-type=module', '--eval', script], {
+      cwd: repoRoot,
+      env,
+      encoding: 'utf8',
+      timeout: 15_000,
+    })
+    assert.equal(result.status, 0, result.stderr || result.stdout || 'storage-auth subprocess failed')
+    const jsonLine = (result.stdout || '').trim().split('\n').reverse().find((line) => line.trim().startsWith('{'))
+    return JSON.parse(jsonLine || '{}') as { credentialSecret: string; fileSecret: string; mode: string }
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+  }
+}
 
 /**
  * Tests for storage-auth helpers.
@@ -146,5 +211,42 @@ describe('Docker key persistence fallback', () => {
     appendEnvKeyIfMissing(generatedEnvPath, 'ACCESS_KEY', 'new-value')
     const vars = parseEnvFile(fs.readFileSync(generatedEnvPath, 'utf8'))
     assert.equal(vars.ACCESS_KEY, 'original')
+  })
+})
+
+describe('credential secret persistence precedence', () => {
+  it('migrates a legacy .env.local credential secret into DATA_DIR', () => {
+    const legacySecret = 'a'.repeat(64)
+    const output = runStorageAuthImport({
+      envLocal: `CREDENTIAL_SECRET=${legacySecret}\n`,
+    })
+
+    assert.equal(output.credentialSecret, legacySecret)
+    assert.equal(output.fileSecret, legacySecret)
+    assert.equal(output.mode, '600')
+  })
+
+  it('uses the DATA_DIR credential secret before legacy env files', () => {
+    const fileSecret = 'b'.repeat(64)
+    const legacySecret = 'a'.repeat(64)
+    const output = runStorageAuthImport({
+      credentialSecretFile: fileSecret,
+      envLocal: `CREDENTIAL_SECRET=${legacySecret}\n`,
+    })
+
+    assert.equal(output.credentialSecret, fileSecret)
+    assert.equal(output.fileSecret, fileSecret)
+  })
+
+  it('lets an explicitly supplied environment credential secret override the file', () => {
+    const externalSecret = 'c'.repeat(64)
+    const fileSecret = 'b'.repeat(64)
+    const output = runStorageAuthImport({
+      externalCredentialSecret: externalSecret,
+      credentialSecretFile: fileSecret,
+    })
+
+    assert.equal(output.credentialSecret, externalSecret)
+    assert.equal(output.fileSecret, fileSecret)
   })
 })

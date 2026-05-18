@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
 import { stripLeakedClassificationJson } from './post-stream-finalization'
+import { sanitizeConnectorDeliveryText } from './chat-execution-connector-delivery'
 
 // A fully-valid MessageClassification serialized by the model. Mirrors the
 // real output we observed during a live delegation turn.
@@ -103,5 +104,28 @@ describe('stripLeakedClassificationJson', () => {
     const { cleaned, stripped } = stripLeakedClassificationJson(input)
     assert.equal(stripped, false)
     assert.equal(cleaned, input)
+  })
+})
+
+describe('sanitizeConnectorDeliveryText', () => {
+  it('strips internal metadata before connector delivery reconciliation', () => {
+    const input = [
+      '{ "isDeliverableTask": true, "confidence": 0.9 }',
+      'I sent the message via the endpoint. Message ID: abc123.',
+    ].join('\n')
+    const result = sanitizeConnectorDeliveryText(input, [
+      {
+        name: 'execute',
+        input: '{"code":"curl -X POST https://example.invalid/send"}',
+        output: 'ok',
+      },
+    ])
+
+    assert.equal(result, 'I sent the message via the endpoint. Message ID: abc123.')
+  })
+
+  it('preserves benign user JSON in non-delivery text', () => {
+    const input = 'The payload example is { "port": 3000 }.'
+    assert.equal(sanitizeConnectorDeliveryText(input, []), input)
   })
 })

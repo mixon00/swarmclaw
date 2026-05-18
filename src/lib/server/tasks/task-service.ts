@@ -171,6 +171,8 @@ export interface PrepareTaskCreationOptions {
   now: number
   settings?: AppSettings | Record<string, unknown> | null
   fallbackAgentId?: string | null
+  creatorAgentId?: string | null
+  autoQueueDelegatedTasks?: boolean
   defaultCwd?: string | null
   deriveTitleFromDescription?: boolean
   requireMeaningfulTitle?: boolean
@@ -194,11 +196,22 @@ export function prepareTaskCreation(options: PrepareTaskCreationOptions): Prepar
     return { ok: false, error: 'Error: manage_tasks create requires a specific title or a meaningful description.' }
   }
 
-  const normalizedStatus = normalizeTaskStatusInput(options.input.status) || 'backlog'
   const description = typeof options.input.description === 'string' ? options.input.description : ''
   const agentId = typeof options.input.agentId === 'string'
-    ? options.input.agentId
-    : (typeof options.fallbackAgentId === 'string' ? options.fallbackAgentId : '')
+    ? options.input.agentId.trim()
+    : (typeof options.fallbackAgentId === 'string' ? options.fallbackAgentId.trim() : '')
+  const explicitStatus = Object.prototype.hasOwnProperty.call(options.input, 'status')
+  let normalizedStatus = normalizeTaskStatusInput(options.input.status) || 'backlog'
+  const creatorAgentId = typeof options.creatorAgentId === 'string' ? options.creatorAgentId.trim() : ''
+  if (
+    !explicitStatus
+    && options.autoQueueDelegatedTasks === true
+    && creatorAgentId
+    && agentId
+    && agentId !== creatorAgentId
+  ) {
+    normalizedStatus = 'queued'
+  }
   const qualityGate = Object.prototype.hasOwnProperty.call(options.input, 'qualityGate')
     ? (options.input.qualityGate
       ? normalizeTaskQualityGate(options.input.qualityGate, options.settings || null)

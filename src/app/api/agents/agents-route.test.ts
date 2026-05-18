@@ -206,6 +206,42 @@ test('PUT /api/agents/:id updates planning mode without clobbering other fields'
   assert.equal(body.proactiveMemory, false)
 })
 
+test('PUT /api/agents/:id persists workspace filesystem settings', async () => {
+  seedAgent('agent-workspace-settings', {
+    name: 'Workspace Agent',
+    workspace: null,
+    filesystemScope: null,
+    fileAccessPolicy: null,
+  })
+
+  const response = await putAgent(new Request('http://local/api/agents/agent-workspace-settings', {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      workspace: '/tmp/swarmclaw-agent-workspace',
+      filesystemScope: 'workspace',
+      fileAccessPolicy: {
+        allowedPaths: ['/tmp/swarmclaw-agent-workspace'],
+        blockedPaths: ['/tmp/swarmclaw-agent-workspace/private'],
+      },
+    }),
+  }), routeParams('agent-workspace-settings'))
+
+  assert.equal(response.status, 200)
+  const body = await response.json()
+  assert.equal(body.workspace, '/tmp/swarmclaw-agent-workspace')
+  assert.equal(body.filesystemScope, 'workspace')
+  assert.deepEqual(body.fileAccessPolicy, {
+    allowedPaths: ['/tmp/swarmclaw-agent-workspace'],
+    blockedPaths: ['/tmp/swarmclaw-agent-workspace/private'],
+  })
+
+  const stored = loadAgents()['agent-workspace-settings']
+  assert.equal(stored.workspace, '/tmp/swarmclaw-agent-workspace')
+  assert.equal(stored.filesystemScope, 'workspace')
+  assert.deepEqual(stored.fileAccessPolicy, body.fileAccessPolicy)
+})
+
 test('PUT /api/agents/:id rejects non-string name', async () => {
   seedAgent('agent-bad-name', { name: 'Good' })
 

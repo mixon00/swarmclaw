@@ -66,6 +66,10 @@ function findReqAt(ws: MockWebSocket, method: string, index: number): WsFrame | 
   return matches[index]
 }
 
+function frameParams<T extends Record<string, unknown>>(frame: WsFrame): T {
+  return (frame.params && typeof frame.params === 'object' ? frame.params : {}) as T
+}
+
 async function waitFor<T>(
   getValue: () => T | null | undefined,
   timeoutMs = 2_000,
@@ -114,8 +118,9 @@ async function bootstrapConnector(params?: {
 async function performHandshake(ws: MockWebSocket, helloPayload?: WsFrame) {
   ws.emit({ type: 'event', event: 'connect.challenge', payload: { nonce: 'test-nonce' } })
   const connectReq = await waitFor(() => findReq(ws, 'connect'), 1_500)
-  assert.equal((connectReq.params as any)?.minProtocol, 4)
-  assert.equal((connectReq.params as any)?.maxProtocol, 4)
+  const connectParams = frameParams<{ minProtocol?: unknown; maxProtocol?: unknown }>(connectReq)
+  assert.equal(connectParams.minProtocol, 4)
+  assert.equal(connectParams.maxProtocol, 4)
   ws.emit({
     type: 'res',
     id: connectReq.id as string,

@@ -19,6 +19,7 @@ let getTaskHandoff: typeof import('./[id]/handoff/route')['GET']
 let postTaskHandoff: typeof import('./[id]/handoff/route')['POST']
 let getTaskExecutionPolicy: typeof import('./[id]/execution-policy/route')['GET']
 let postTaskExecutionPolicy: typeof import('./[id]/execution-policy/route')['POST']
+let postTaskRetry: typeof import('./[id]/retry/route')['POST']
 let getTaskHandoffs: typeof import('./handoffs/route')['GET']
 let getTasks: typeof import('./route')['GET']
 let storage: typeof import('@/lib/server/storage')
@@ -57,6 +58,7 @@ before(async () => {
   const policyRoute = await import('./[id]/execution-policy/route')
   getTaskExecutionPolicy = policyRoute.GET
   postTaskExecutionPolicy = policyRoute.POST
+  postTaskRetry = (await import('./[id]/retry/route')).POST
   getTaskHandoffs = (await import('./handoffs/route')).GET
   getTasks = (await import('./route')).GET
 })
@@ -253,6 +255,66 @@ test('GET /api/tasks/:id/execution-policy returns policy summary', async () => {
   const body = await response.json()
   assert.equal(body.summary.enabled, true)
   assert.equal(body.summary.status, 'waiting')
+})
+
+test('POST /api/tasks/:id/retry requeues a dead-lettered failed task', async () => {
+  seedTask('task-dead-letter-retry', {
+    title: 'Dead Letter Retry',
+    status: 'failed',
+    attempts: 3,
+    maxAttempts: 3,
+    retryScheduledAt: Date.now() + 60_000,
+    deadLetteredAt: Date.now(),
+    checkoutRunId: 'run-failed',
+    error: 'Dead-lettered after 3/3 attempts: timeout',
+    validation: { ok: false, reasons: ['No result'], checkedAt: Date.now() },
+  })
+
+  const response = await postTaskRetry(
+    new Request('http://local/api/tasks/task-dead-letter-retry/retry', { method: 'POST' }),
+    routeParams('task-dead-letter-retry'),
+  )
+
+  assert.equal(response.status, 200)
+  const body = await response.json() as BoardTask
+  assert.equal(body.status, 'queued')
+  assert.equal(body.attempts, 0)
+  assert.equal(body.retryScheduledAt, null)
+  assert.equal(body.deadLetteredAt, null)
+  assert.equal(body.checkoutRunId, null)
+  assert.equal(body.error, null)
+  assert.equal(body.validation, null)
+  assert.equal(storage.loadQueue().includes('task-dead-letter-retry'), true)
+  assert.equal(body.comments?.some((comment) => comment.text.includes('retry requested')), true)
+})
+
+test('POST /api/tasks/:id/retry rejects tasks still blocked by dependencies', async () => {
+  seedTask('task-blocked-retry', {
+    title: 'Blocked Retry',
+    status: 'failed',
+    blockedBy: ['retry-dep'],
+    deadLetteredAt: Date.now(),
+  })
+  const tasks = storage.loadTasks()
+  tasks['retry-dep'] = {
+    id: 'retry-dep',
+    title: 'Retry Dependency',
+    description: '',
+    status: 'running',
+    agentId: 'agent-1',
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  } as BoardTask
+  storage.saveTasks(tasks)
+
+  const response = await postTaskRetry(
+    new Request('http://local/api/tasks/task-blocked-retry/retry', { method: 'POST' }),
+    routeParams('task-blocked-retry'),
+  )
+
+  assert.equal(response.status, 409)
+  assert.equal(storage.loadTasks()['task-blocked-retry']?.status, 'failed')
+  assert.equal(storage.loadQueue().includes('task-blocked-retry'), false)
 })
 
 test('POST /api/tasks/:id/handoff saves markdown and JSON snapshots into the workspace', async () => {

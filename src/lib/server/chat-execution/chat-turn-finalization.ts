@@ -12,7 +12,7 @@ import { stripMainLoopMetaForPersistence } from '@/lib/server/agents/main-agent-
 import { shouldSuppressHiddenControlText, stripHiddenControlTokens } from '@/lib/server/agents/assistant-control'
 import { pruneStreamingAssistantArtifacts } from '@/lib/chat/chat-streaming-state'
 import { pruneIncompleteToolEvents } from '@/lib/server/chat-execution/chat-streaming-utils'
-import { reconcileConnectorDeliveryText } from '@/lib/server/chat-execution/chat-execution-connector-delivery'
+import { sanitizeConnectorDeliveryText } from '@/lib/server/chat-execution/chat-execution-connector-delivery'
 import {
   classifyHeartbeatResponse,
   estimateConversationTone,
@@ -347,7 +347,7 @@ export async function finalizeChatTurn(params: {
       // Outbound transforms are non-critical.
     }
   }
-  finalText = reconcileConnectorDeliveryText(finalText, persistedToolEvents)
+  finalText = sanitizeConnectorDeliveryText(finalText, persistedToolEvents)
   finalText = normalizeAssistantArtifactLinks(finalText, session.cwd)
   finalText = applyExactOutputContract({
     contract: await resolveExactOutputContractWithTimeout({

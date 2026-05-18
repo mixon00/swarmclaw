@@ -290,6 +290,52 @@ export function updateTaskFromRoute(id: string, body: Record<string, unknown>): 
   return serviceOk(tasks[id])
 }
 
+export function retryTaskFromRoute(id: string): ServiceResult<BoardTask> {
+  const tasks = loadTasks()
+  const task = tasks[id]
+  if (!task) return serviceFail(404, 'Task not found')
+  if (task.status !== 'failed') {
+    return serviceFail(409, 'Only failed tasks can be retried.')
+  }
+
+  const blockers = Array.isArray(task.blockedBy) ? task.blockedBy : []
+  const incompleteBlocker = blockers.find((bid: string) => tasks[bid] && tasks[bid].status !== 'completed')
+  if (incompleteBlocker) {
+    return serviceFail(409, 'Cannot retry: blocked by incomplete tasks')
+  }
+
+  const now = Date.now()
+  if (!task.comments) task.comments = []
+  task.comments.push({
+    id: genId(),
+    author: 'System',
+    text: 'Task retry requested by operator.',
+    createdAt: now,
+  })
+  task.status = 'queued'
+  task.attempts = 0
+  task.deadLetteredAt = null
+  task.retryScheduledAt = null
+  task.checkoutRunId = null
+  task.error = null
+  task.validation = null
+  task.startedAt = null
+  task.completedAt = null
+  task.queuedAt = now
+  task.updatedAt = now
+  task.liveness = computeTaskLiveness(task, tasks, { now })
+
+  saveTask(id, task)
+  enqueueTask(id)
+  logActivity({ entityType: 'task', entityId: id, action: 'queued', actor: 'user', summary: `Task retried: "${task.title}"` })
+  pushMainLoopEventToMainSessions({
+    type: 'task_queued',
+    text: `Task retried and queued: "${task.title}" (${id}).`,
+  })
+  notify('tasks')
+  return serviceOk(loadTask(id) || task)
+}
+
 export function decideTaskExecutionPolicyFromRoute(
   id: string,
   body: Record<string, unknown>,

@@ -1,5 +1,6 @@
 import type { MessageToolEvent } from '@/types'
 import { dedupeConsecutiveToolEvents } from '@/lib/server/chat-execution/chat-execution-tool-events'
+import { stripAllInternalMetadata } from '@/lib/strip-internal-metadata'
 
 function parseToolJsonObject(raw: string): Record<string, unknown> | null {
   const trimmed = raw.trim()
@@ -94,4 +95,8 @@ export function reconcileConnectorDeliveryText(text: string, events: MessageTool
     : 'I could not confirm that the connector actually sent anything.'
 
   return `I couldn't send that through the configured connector. ${failureSummary}`.trim()
+}
+
+export function sanitizeConnectorDeliveryText(text: string, events: MessageToolEvent[]): string {
+  return reconcileConnectorDeliveryText(stripAllInternalMetadata(text), events).trim()
 }

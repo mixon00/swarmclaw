@@ -192,6 +192,61 @@ describe('manage_tasks tool', () => {
     assert.equal(output.stored.workflowStateId, 'in_progress')
   })
 
+  it('queues agent-delegated tasks when no explicit status is provided', () => {
+    const output = runWithTempDataDir(`
+      const storageMod = await import('./src/lib/server/storage')
+      const crudMod = await import('./src/lib/server/session-tools/crud')
+      const storage = storageMod.default || storageMod
+      const crud = crudMod.default || crudMod
+
+      const now = Date.now()
+      storage.saveAgents({
+        coordinator: {
+          id: 'coordinator',
+          name: 'Coordinator',
+          description: '',
+          systemPrompt: '',
+          provider: 'openai',
+          model: 'gpt-test',
+          createdAt: now,
+          updatedAt: now,
+        },
+        worker: {
+          id: 'worker',
+          name: 'Worker',
+          description: '',
+          systemPrompt: '',
+          provider: 'openai',
+          model: 'gpt-test',
+          createdAt: now,
+          updatedAt: now,
+        },
+      })
+
+      const tools = crud.buildCrudTools({
+        cwd: process.env.WORKSPACE_DIR,
+        ctx: { sessionId: 'session-delegate', agentId: 'coordinator', delegationEnabled: true, delegationTargetMode: 'all', delegationTargetAgentIds: [] },
+        hasExtension: (name) => name === 'manage_tasks',
+      })
+      const tool = tools.find((entry) => entry.name === 'manage_tasks')
+      const raw = await tool.invoke({
+        action: 'create',
+        title: 'Worker follow-up',
+        description: 'Please take this delegated implementation task.',
+        agentId: 'worker',
+      })
+      const response = JSON.parse(raw)
+      const stored = storage.loadTasks()[response.id]
+      const queue = storage.loadQueue()
+      console.log(JSON.stringify({ response, stored, queue }))
+    `)
+
+    assert.equal(output.response.status, 'queued')
+    assert.equal(output.stored.status, 'queued')
+    assert.equal(output.stored.agentId, 'worker')
+    assert.deepEqual(output.queue, [output.response.id])
+  })
+
   it('keeps an explicit assignee but returns delegation advisory when another teammate is a better fit', () => {
     const output = runWithTempDataDir(`
       const storageMod = await import('./src/lib/server/storage')
