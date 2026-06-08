@@ -151,6 +151,15 @@ openclaw skills install swarmclaw
 
 [Browse on ClawHub](https://clawhub.ai/waydelyle/swarmclaw)
 
+## v1.9.38 Highlights
+
+PR integration release for provider catalog coverage, OpenRouter context meters, and safer unsigned macOS desktop artifacts.
+
+- **TokenMix provider.** Added TokenMix as a built-in OpenAI-compatible provider with setup metadata, starter-agent defaults, and provider health checks.
+- **OpenRouter context meters.** Chat context status now uses cached OpenRouter model metadata when available so routed model context windows display accurately.
+- **macOS unsigned artifact fallback.** Desktop releases publish zip-only macOS artifacts when signing/notarization inputs are missing, avoiding the unsigned DMG damaged-app path.
+- **Regression coverage.** Added targeted tests for TokenMix setup, OpenRouter context metadata caching, and macOS target selection.
+
 ## v1.9.37 Highlights
 
 Theme and memory-pressure release for lighter UI preferences and leaner chat history storage.
@@ -478,6 +487,15 @@ If you need a trace-specific endpoint, set `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` 
 Operational docs: https://swarmclaw.ai/docs/observability
 
 ## Releases
+
+### v1.9.38 Highlights
+
+PR integration release for provider catalog coverage, OpenRouter context meters, and safer unsigned macOS desktop artifacts.
+
+- **TokenMix provider.** Added TokenMix as a built-in OpenAI-compatible provider with setup metadata, starter-agent defaults, and provider health checks.
+- **OpenRouter context meters.** Chat context status now uses cached OpenRouter model metadata when available so routed model context windows display accurately.
+- **macOS unsigned artifact fallback.** Desktop releases publish zip-only macOS artifacts when signing/notarization inputs are missing, avoiding the unsigned DMG damaged-app path.
+- **Regression coverage.** Added targeted tests for TokenMix setup, OpenRouter context metadata caching, and macOS target selection.
 
 ### v1.9.37 Highlights
 
